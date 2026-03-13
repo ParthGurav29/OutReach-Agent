@@ -1,0 +1,20 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Node
+node_modules/
+dist/
+build/
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
