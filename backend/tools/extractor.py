@@ -6,102 +6,123 @@ from dotenv import load_dotenv
 load_dotenv()
 
 MODEL_ID = os.getenv("NOVA_MICRO_MODEL_ID")
+AWS_REGION = os.getenv("AWS_REGION")
 
-bedrock = boto3.client(
+client = boto3.client(
     "bedrock-runtime",
-    region_name=os.getenv("AWS_REGION")
+    region_name=AWS_REGION
 )
 
 
-def empty_prospect():
-    """
-    Ensures a clean schema is always returned
-    """
-    return {
-        "name": None,
-        "role": None,
-        "location": None,
-        "skills": [],
-        "recent_work": None,
-        "personalisation_hook": None,
-        "contact_url": None
+# ---------------------------------------------------
+# MODEL CALL
+# ---------------------------------------------------
+
+def call_model(prompt: str):
+
+    body = {
+        "messages": [
+            {
+                "role": "user",
+                "content": [{"text": prompt}]
+            }
+        ],
+        "inferenceConfig": {
+            "maxTokens": 600,
+            "temperature": 0.2
+        }
     }
 
+    try:
 
-async def extract_prospect(result):
+        response = client.invoke_model(
+            modelId=MODEL_ID,
+            body=json.dumps(body)
+        )
+
+        raw = json.loads(response["body"].read())
+
+        text = raw["output"]["message"]["content"][0]["text"].strip()
+
+        # remove markdown fences if model returns ```json
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+
+        return text.strip()
+
+    except Exception as e:
+
+        print("⚠️ Model call failed:", e)
+        return None
+
+
+# ---------------------------------------------------
+# PROSPECT EXTRACTION
+# ---------------------------------------------------
+
+async def extract_prospect(search_result: dict):
+
+    title = search_result.get("title")
+    url = search_result.get("url")
+    snippet = search_result.get("snippet")
 
     prompt = f"""
-You are a lead research assistant.
+You are a data extraction system.
 
-Extract structured prospect information from the web result.
+Extract the professional profile from the search result.
 
 Return ONLY JSON.
 
-Required schema:
+Search Result:
+
+Title: {title}
+Snippet: {snippet}
+URL: {url}
+
+Return JSON format:
 
 {{
-"name": string | null,
-"role": string | null,
-"location": string | null,
-"skills": string[],
-"recent_work": string | null,
-"personalisation_hook": string | null,
-"contact_url": string | null
+"name": "",
+"role": "",
+"location": "",
+"skills": [],
+"recent_work": "",
+"personalisation_hook": "",
+"contact_url": ""
 }}
 
 Rules:
-- If data is missing return null
-- skills must always be an array
-- contact_url should be LinkedIn or website
 
-Web Result:
-Title: {result['title']}
-Snippet: {result['snippet']}
-URL: {result['url']}
+- If information is unknown return null
+- name should be the person's full name
+- role should be their job title
+- personalisation_hook should be one sentence useful for outreach
+- contact_url should be the LinkedIn profile URL
 """
 
     try:
 
-        response = bedrock.invoke_model(
-            modelId=MODEL_ID,
-            body=json.dumps({
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [{"text": prompt}]
-                    }
-                ],
-                "inferenceConfig": {
-                    "maxTokens": 300,
-                    "temperature": 0.2
-                }
-            })
-        )
+        response = call_model(prompt)
 
-        response_body = json.loads(response["body"].read())
+        if not response:
+            return None
 
-        text_output = response_body["output"]["message"]["content"][0]["text"]
+        prospect = json.loads(response)
 
-        # Clean markdown formatting
-        text_output = text_output.replace("```json", "").replace("```", "").strip()
-
-        data = json.loads(text_output)
-
-        prospect = empty_prospect()
-
-        prospect["name"] = data.get("name")
-        prospect["role"] = data.get("role")
-        prospect["location"] = data.get("location")
-        prospect["skills"] = data.get("skills", [])
-        prospect["recent_work"] = data.get("recent_work")
-        prospect["personalisation_hook"] = data.get("personalisation_hook")
-        prospect["contact_url"] = data.get("contact_url")
+        # ensure required fields exist
+        prospect.setdefault("name", None)
+        prospect.setdefault("role", None)
+        prospect.setdefault("location", None)
+        prospect.setdefault("skills", [])
+        prospect.setdefault("recent_work", None)
+        prospect.setdefault("personalisation_hook", None)
+        prospect.setdefault("contact_url", url)
 
         return prospect
 
     except Exception as e:
 
-        print("\n⚠️ Extraction error:", result["url"])
-        print("Reason:", e)
-
-        return empty_prospect()
+        print("⚠️ Extraction failed:", e)
+        return None

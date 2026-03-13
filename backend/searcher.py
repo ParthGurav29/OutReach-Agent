@@ -1,44 +1,57 @@
 import os
-import asyncio
-from tavily import TavilyClient
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Safely initialize the client
-api_key = os.getenv("TAVILY_API_KEY")
-if not api_key:
-    print("⚠️ Warning: TAVILY_API_KEY is missing from your .env file!")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
-tavily = TavilyClient(api_key=api_key)
+TAVILY_URL = "https://api.tavily.com/search"
 
 
+# ---------------------------------------------------
+# SEARCH WEB
+# ---------------------------------------------------
 
-async def search_web(query):
+async def search_web(query: str):
+
+    if not TAVILY_API_KEY:
+        raise ValueError("TAVILY_API_KEY not set in environment")
+
+    payload = {
+        "api_key": TAVILY_API_KEY,
+        "query": query,
+        "search_depth": "basic",
+        "max_results": 10
+    }
 
     try:
 
-        response = tavily.search(
-            query=query,
-            search_depth="basic",
-            max_results=8   # 🔴 LIMIT HERE
-        )
+        async with httpx.AsyncClient(timeout=30) as client:
 
-        return response.get("results", [])
+            response = await client.post(
+                TAVILY_URL,
+                json=payload
+            )
+
+            data = response.json()
+
+            results = data.get("results", [])
+
+            formatted_results = []
+
+            for r in results:
+
+                formatted_results.append({
+                    "title": r.get("title"),
+                    "url": r.get("url"),
+                    "snippet": r.get("content")
+                })
+
+            return formatted_results
 
     except Exception as e:
 
-        print(f"⚠️ Tavily Search Error for query '{query}': {e}")
+        print("⚠️ Tavily search failed:", e)
+
         return []
-    
-
-if __name__ == "__main__":
-    import asyncio
-
-    async def test():
-        results = await search_web("SaaS founder communities")
-
-        for r in results:
-            print(r)
-
-    asyncio.run(test())
