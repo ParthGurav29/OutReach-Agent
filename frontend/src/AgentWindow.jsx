@@ -48,15 +48,15 @@ export default function AgentWindow({ currentStep, activeLead }) {
   return (
     <div
       style={{
-        background: "#0a0e14",
-        border: "1px solid #1a2236",
-        borderLeft: "3px solid #6366f1",
-        borderRadius: "6px",
-        padding: "14px 18px",
+        background: "#ffffff",
+        border: "1px solid #eaedf3",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+        borderRadius: "12px",
+        padding: "20px 24px",
         marginBottom: "20px",
-        maxHeight: "220px",
+        maxHeight: "260px",
         overflowY: "auto",
-        fontFamily: "'IBM Plex Mono', monospace",
+        fontFamily: "Inter, -apple-system, sans-serif",
       }}
     >
       {/* Header */}
@@ -65,30 +65,29 @@ export default function AgentWindow({ currentStep, activeLead }) {
           display: "flex",
           alignItems: "center",
           gap: "8px",
-          marginBottom: "12px",
-          fontSize: "10px",
-          color: "#6366f1",
-          letterSpacing: "0.15em",
+          marginBottom: "16px",
+          fontSize: "16px",
+          color: "#1e293b",
           fontWeight: 700,
         }}
       >
         <span
           style={{
             display: "inline-block",
-            width: "7px",
-            height: "7px",
+            width: "8px",
+            height: "8px",
             borderRadius: "50%",
             background:
-              currentStep === "ready" ? "#4ade80" : "#6366f1",
+              currentStep === "ready" ? "#10b981" : "#4f46e5",
             animation:
               currentStep !== "ready" ? "agentPulse 1.2s ease-in-out infinite" : "none",
           }}
         />
-        AGENT THINKING
+        Agent Thinking
       </div>
 
       {/* Step list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         {steps.map((step, idx) => {
           const isDone    = idx < currentIdx;
           const isActive  = idx === currentIdx;
@@ -100,15 +99,15 @@ export default function AgentWindow({ currentStep, activeLead }) {
               style={{
                 display: "flex",
                 alignItems: "flex-start",
-                gap: "10px",
-                opacity: isPending ? 0.35 : 1,
+                gap: "12px",
+                opacity: isPending ? 0.4 : 1,
                 transition: "opacity 0.3s ease",
               }}
             >
               {/* Status icon column */}
-              <div style={{ width: "18px", flexShrink: 0, textAlign: "center", paddingTop: "1px" }}>
+              <div style={{ width: "20px", flexShrink: 0, textAlign: "center", paddingTop: "2px" }}>
                 {isDone ? (
-                  <span style={{ color: "#4ade80", fontSize: "12px" }}>✓</span>
+                  <span style={{ color: "#10b981", fontSize: "14px" }}>✓</span>
                 ) : isActive ? (
                   <span
                     style={{
@@ -116,13 +115,13 @@ export default function AgentWindow({ currentStep, activeLead }) {
                       width: "8px",
                       height: "8px",
                       borderRadius: "50%",
-                      background: "#6366f1",
+                      background: "#4f46e5",
                       animation: "agentPulse 1.2s ease-in-out infinite",
-                      marginTop: "3px",
+                      marginTop: "4px",
                     }}
                   />
                 ) : (
-                  <span style={{ color: "#2d3748", fontSize: "12px" }}>○</span>
+                  <span style={{ color: "#cbd5e1", fontSize: "14px" }}>○</span>
                 )}
               </div>
 
@@ -130,16 +129,16 @@ export default function AgentWindow({ currentStep, activeLead }) {
               <div>
                 <div
                   style={{
-                    fontSize: "12px",
-                    fontWeight: isActive ? 700 : 400,
+                    fontSize: "14px",
+                    fontWeight: isActive ? 600 : 500,
                     color: isDone
-                      ? "#4ade80"
+                      ? "#10b981"
                       : isActive
-                      ? "#e2e8f0"
-                      : "#334155",
+                      ? "#1e293b"
+                      : "#64748b",
                     display: "flex",
                     alignItems: "center",
-                    gap: "6px",
+                    gap: "8px",
                   }}
                 >
                   <span>{step.icon}</span>
@@ -147,9 +146,9 @@ export default function AgentWindow({ currentStep, activeLead }) {
                 </div>
                 <div
                   style={{
-                    fontSize: "10px",
-                    color: isDone ? "#1e4030" : isActive ? "#475569" : "#1f2937",
-                    marginTop: "2px",
+                    fontSize: "12px",
+                    color: isDone ? "#64748b" : isActive ? "#64748b" : "#94a3b8",
+                    marginTop: "4px",
                     lineHeight: "1.5",
                   }}
                 >

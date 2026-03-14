@@ -5,7 +5,6 @@ import Sidebar from "./Sidebar";
 const SESSION_ID = crypto.randomUUID();
 const STATUS = { IDLE: "idle", RUNNING: "running", DONE: "done", ERROR: "error" };
 
-// Defined at module scope so useEffect dependency array is stable
 const AGENT_STEP_IDS = ["searching", "enriching", "drafting-v1", "generating", "ready"];
 
 const ROLES = ["Founder", "CEO", "CTO", "CMO", "HR Manager", "Talent Acquisition", "CHRO", "Director", "Head of Growth", "Marketing Manager", "Product Manager", "Sales Head"];
@@ -47,18 +46,18 @@ function exportCSV(targets) {
 
 function ConfidenceBadge({ confidence }) {
   const map = {
-    high:             { color: "#4ade80", bg: "#052e16", label: "verified" },
-    smtp:             { color: "#4ade80", bg: "#052e16", label: "smtp ✓" },
-    "low (catch-all)":{ color: "#fbbf24", bg: "#1c1400", label: "catch-all" },
-    low:              { color: "#f87171", bg: "#1c0a0a", label: "guessed" },
-    "low (smtp blocked)": { color: "#f87171", bg: "#1c0a0a", label: "guessed" },
-    "low (pattern guess)":{ color: "#f87171", bg: "#1c0a0a", label: "guessed" },
-    pattern_fallback: { color: "#f87171", bg: "#1c0a0a", label: "guessed" },
-    unresolved:       { color: "#6b7280", bg: "#111", label: "not found" },
+    high:             { color: "#166534", bg: "#dcfce7", label: "verified" },
+    smtp:             { color: "#166534", bg: "#dcfce7", label: "smtp ✓" },
+    "low (catch-all)":{ color: "#9a3412", bg: "#ffedd5", label: "catch-all" },
+    low:              { color: "#991b1b", bg: "#fee2e2", label: "guessed" },
+    "low (smtp blocked)": { color: "#991b1b", bg: "#fee2e2", label: "guessed" },
+    "low (pattern guess)":{ color: "#991b1b", bg: "#fee2e2", label: "guessed" },
+    pattern_fallback: { color: "#991b1b", bg: "#fee2e2", label: "guessed" },
+    unresolved:       { color: "#475569", bg: "#f1f5f9", label: "not found" },
   };
   const style = map[confidence] || map["unresolved"];
   return (
-    <span style={{ background: style.bg, color: style.color, padding: "1px 6px", borderRadius: "3px", fontSize: "10px", fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>
+    <span style={{ background: style.bg, color: style.color, padding: "2px 8px", borderRadius: "999px", fontSize: "11px", fontWeight: 600 }}>
       {style.label}
     </span>
   );
@@ -67,21 +66,21 @@ function ConfidenceBadge({ confidence }) {
 function ChipGroup({ label, options, selected, onChange }) {
   const toggle = opt => onChange(selected.includes(opt) ? selected.filter(s => s !== opt) : [...selected, opt]);
   return (
-    <div style={{ marginBottom: "14px" }}>
-      <div style={{ fontSize: "10px", color: "#475569", letterSpacing: "0.12em", marginBottom: "7px", fontFamily: "'IBM Plex Mono', monospace" }}>{label}</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+    <div style={{ marginBottom: "20px" }}>
+      <div style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
         {options.map(opt => {
           const active = selected.includes(opt);
           return (
             <button key={opt} onClick={() => toggle(opt)} style={{
-              padding: "3px 9px", borderRadius: "3px",
-              border: active ? "1px solid #6366f1" : "1px solid #1f2937",
-              background: active ? "#1e1b4b" : "#0d1117",
-              color: active ? "#a5b4fc" : "#475569",
-              fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px",
-              cursor: "pointer", transition: "all 0.12s", fontWeight: active ? 700 : 400,
+              padding: "6px 14px", borderRadius: "999px",
+              border: active ? "1px solid #c7d2fe" : "1px solid #eaedf3",
+              background: active ? "#e0e7ff" : "#f8fafc",
+              color: active ? "#4f46e5" : "#64748b",
+              fontSize: "13px", fontWeight: active ? 600 : 500,
+              cursor: "pointer", transition: "all 0.15s",
             }}>
-              {active ? "✓ " : ""}{opt}
+              {opt}
             </button>
           );
         })}
@@ -90,25 +89,20 @@ function ChipGroup({ label, options, selected, onChange }) {
   );
 }
 
-function WordCount({ count }) {
-  const color = count >= 80 && count <= 120 ? "#4ade80" : count === 0 ? "#6b7280" : "#f87171";
-  return <span style={{ color, fontWeight: 600, fontSize: "10px", fontFamily: "'IBM Plex Mono', monospace" }}>{count}w</span>;
-}
-
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     navigator.clipboard.writeText(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setTimeout(() => setCopied(false), 2000);
   };
   return (
     <button onClick={copy} style={{
-      background: "transparent", border: "1px solid #1f2937", borderRadius: "3px",
-      color: copied ? "#4ade80" : "#475569", fontFamily: "'IBM Plex Mono', monospace",
-      fontSize: "10px", padding: "2px 8px", cursor: "pointer",
+      background: "#ffffff", border: "1px solid #eaedf3", borderRadius: "6px",
+      color: copied ? "#10b981" : "#64748b", fontSize: "12px", fontWeight: 500, padding: "6px 12px", cursor: "pointer",
+      display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s"
     }}>
-      {copied ? "✓ copied" : "copy"}
+      {copied ? "✓ Copied" : "Copy"}
     </button>
   );
 }
@@ -117,15 +111,15 @@ function SaveButton() {
   const [saved, setSaved] = useState(false);
   const save = () => {
     setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    setTimeout(() => setSaved(false), 2000);
   };
   return (
     <button onClick={save} style={{
-      background: "transparent", border: "1px solid #1f2937", borderRadius: "3px",
-      color: saved ? "#4ade80" : "#475569", fontFamily: "'IBM Plex Mono', monospace",
-      fontSize: "10px", padding: "2px 8px", cursor: "pointer",
+      background: "#ffffff", border: "1px solid #eaedf3", borderRadius: "6px",
+      color: saved ? "#10b981" : "#64748b", fontSize: "12px", fontWeight: 500, padding: "6px 12px", cursor: "pointer",
+      display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s"
     }}>
-      {saved ? "✓ saved" : "save edit"}
+      {saved ? "✓ Saved" : "Save Edit"}
     </button>
   );
 }
@@ -137,12 +131,10 @@ function EmailCard({ item, index, sessionId, prospectId }) {
   const { prospect, score, email } = item;
   const hasEmail = !!prospect?.email;
 
-  // Assume single variant if 'variants' is missing
   const variants = email?.variants || (email?.subject ? [
     { type: "Direct", subject: email.subject, body: email.body, personalisation_used: email.personalisation_used, word_count: email.word_count }
   ] : []);
 
-  // Set default tab to the first variant type found
   const [activeTab, setActiveTab] = useState(variants[0]?.type || "Direct");
 
   const [edits, setEdits] = useState(() => {
@@ -187,53 +179,53 @@ function EmailCard({ item, index, sessionId, prospectId }) {
 
   return (
     <div style={{
-      border: "1px solid #1f2937",
-      borderLeft: `3px solid ${hasEmail ? "#6366f1" : "#374151"}`,
-      marginBottom: "8px", background: open ? "#0d1117" : "#0a0e14",
-      borderRadius: "4px", overflow: "hidden",
+      background: "#ffffff",
+      border: "1px solid #eaedf3",
+      borderLeft: `4px solid ${hasEmail ? "#4f46e5" : "#cbd5e1"}`,
+      marginBottom: "16px",
+      borderRadius: "12px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+      overflow: "hidden",
     }}>
-      <button onClick={() => setOpen(o => !o)} style={{
-        width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "10px 14px", background: "transparent", border: "none", cursor: "pointer",
-        color: "#e2e8f0", fontFamily: "'IBM Plex Mono', monospace", fontSize: "12px", textAlign: "left",
+      <div onClick={() => setOpen(o => !o)} style={{
+        padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", cursor: "pointer",
       }}>
-        <span>
-          <span style={{ color: "#6366f1", marginRight: "8px" }}>#{String(index + 1).padStart(2, "0")}</span>
-          <span style={{ fontWeight: 600 }}>{prospect?.name}</span>
-          <span style={{ color: "#64748b", marginLeft: "8px", fontSize: "11px" }}>{prospect?.role}</span>
-        </span>
-        <span style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          {hasEmail && <ConfidenceBadge confidence={prospect?.email_confidence} />}
-          {!hasEmail && <span style={{ fontSize: "10px", color: "#4b5563" }}>❌ no email</span>}
-          <span style={{ background: "#1e1b4b", color: "#818cf8", padding: "1px 6px", borderRadius: "999px", fontSize: "10px", fontWeight: 700 }}>{score}</span>
-          <WordCount count={editState.body.split(/\s+/).filter(w => w.length > 0).length} />
-          <span style={{ color: "#4b5563", fontSize: "12px" }}>{open ? "▲" : "▼"}</span>
-        </span>
-      </button>
+        <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+          <span style={{ color: "#4f46e5", fontWeight: 700, fontSize: "14px", marginTop: "2px" }}>#{String(index + 1).padStart(2, "0")}</span>
+          <div>
+            <div style={{ fontWeight: 700, color: "#1e293b", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              {prospect?.name}
+              {!hasEmail && <span style={{ fontSize: "12px", background: "#f1f5f9", color: "#64748b", padding: "2px 8px", borderRadius: "999px", fontWeight: 500 }}>No Email</span>}
+              {hasEmail && <ConfidenceBadge confidence={prospect?.email_confidence} />}
+            </div>
+            <div style={{ color: "#64748b", fontSize: "13px", marginTop: "4px" }}>{prospect?.role}</div>
+            <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "2px" }}>{prospect?.company}</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{ background: "#f1f5f9", color: "#4f46e5", padding: "4px 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 600 }}>Score {score}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#64748b", fontSize: "12px", fontWeight: 500 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            {editState.body.split(/\s+/).filter(w => w.length > 0).length}w
+          </span>
+        </div>
+      </div>
 
       {open && (
-        <div style={{ padding: "0 14px 14px 14px", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", lineHeight: "1.8", color: "#94a3b8", borderTop: "1px solid #1f2937", paddingTop: "12px" }}>
-          {hasEmail && (
-            <div style={{ marginBottom: "8px" }}>
-              <span style={{ color: "#475569" }}>EMAIL → </span>
-              <span style={{ color: "#4ade80" }}>{prospect.email}</span>
-              <span style={{ marginLeft: "8px" }}><ConfidenceBadge confidence={prospect.email_confidence} /></span>
-            </div>
-          )}
-          
+        <div style={{ padding: "0 20px 20px 20px", borderTop: "1px solid #eaedf3", paddingTop: "20px" }}>
           {/* Variant Tabs */}
           {variants.length > 0 && (
-            <div style={{ display: "flex", gap: "10px", marginBottom: "12px", borderBottom: "1px solid #1f2937", paddingBottom: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
               {variants.map(v => (
                 <button
                   key={v.type}
                   onClick={() => setActiveTab(v.type)}
                   style={{
-                    background: "transparent", border: "none",
-                    color: activeTab === v.type ? "#a5b4fc" : "#475569",
-                    fontWeight: activeTab === v.type ? 700 : 400,
-                    textTransform: "uppercase", fontSize: "10px", fontFamily: "'IBM Plex Mono', monospace",
-                    cursor: "pointer", padding: "0 4px"
+                    background: activeTab === v.type ? "#f1f5f9" : "transparent",
+                    border: "none", borderRadius: "6px",
+                    color: activeTab === v.type ? "#1e293b" : "#64748b",
+                    fontWeight: activeTab === v.type ? 600 : 500,
+                    fontSize: "13px", padding: "6px 12px", cursor: "pointer", transition: "all 0.2s"
                   }}
                 >
                   {v.type}
@@ -242,61 +234,63 @@ function EmailCard({ item, index, sessionId, prospectId }) {
             </div>
           )}
 
-          <div style={{ marginBottom: "6px" }}>
-            <span style={{ color: "#475569", display: "block", marginBottom: "4px" }}>SUBJECT → </span>
+          <div style={{ marginBottom: "16px" }}>
+            <div style={{ color: "#64748b", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>Subject</div>
             <input 
               value={editState.subject}
               onChange={e => handleEdit("subject", e.target.value)}
               style={{
-                width: "100%", background: "#060912", border: "1px solid #1f2937", borderRadius: "4px",
-                color: "#e2e8f0", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", padding: "6px 10px", outline: "none", boxSizing: "border-box"
+                width: "100%", background: "#ffffff", border: "1px solid #eaedf3", borderRadius: "8px",
+                color: "#1e293b", fontSize: "14px", padding: "10px 14px", outline: "none", boxSizing: "border-box", transition: "border 0.2s"
               }}
-              onFocus={e => e.target.style.borderColor = "#6366f1"}
-              onBlur={e => e.target.style.borderColor = "#1f2937"}
+              onFocus={e => e.target.style.borderColor = "#c7d2fe"}
+              onBlur={e => e.target.style.borderColor = "#eaedf3"}
             />
           </div>
 
-          <div style={{ marginBottom: "10px" }}>
-            <span style={{ color: "#475569" }}>HOOK → </span>
-            <span style={{ color: "#a5b4fc" }}>{activeVariantInfo.personalisation_used || email?.personalisation_used}</span>
+          <div style={{ marginBottom: "16px" }}>
+            <div style={{ color: "#64748b", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>Hook</div>
+            <div style={{ color: "#1e293b", fontSize: "14px", padding: "2px 4px" }}>
+              {activeVariantInfo.personalisation_used || email?.personalisation_used}
+            </div>
           </div>
 
-          <div style={{ marginBottom: "10px" }}>
-            <span style={{ color: "#475569", display: "block", marginBottom: "4px" }}>BODY → </span>
+          <div style={{ marginBottom: "24px" }}>
+            <div style={{ color: "#64748b", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>Body</div>
             <textarea
               value={editState.body}
               onChange={e => handleEdit("body", e.target.value)}
               style={{
-                width: "100%", minHeight: "140px", background: "#111827", border: "1px solid #1f2937", borderRadius: "4px",
-                color: "#cbd5e1", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", lineHeight: "1.9", padding: "10px", outline: "none", resize: "vertical", boxSizing: "border-box"
+                width: "100%", minHeight: "160px", background: "#ffffff", border: "1px solid #eaedf3", borderRadius: "8px",
+                color: "#1e293b", fontSize: "14px", lineHeight: "1.6", padding: "12px 14px", outline: "none", resize: "vertical", boxSizing: "border-box", transition: "border 0.2s"
               }}
-              onFocus={e => e.target.style.borderColor = "#6366f1"}
-              onBlur={e => e.target.style.borderColor = "#1f2937"}
+              onFocus={e => e.target.style.borderColor = "#c7d2fe"}
+              onBlur={e => e.target.style.borderColor = "#eaedf3"}
             />
           </div>
           
           {/* Action row */}
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <CopyButton text={`Subject: ${editState.subject}\n\n${editState.body}`} />
-            <SaveButton />
-            {hasEmail && (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #eaedf3", paddingTop: "16px" }}>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <CopyButton text={`Subject: ${editState.subject}\n\n${editState.body}`} />
+              <SaveButton />
+            </div>
+            {hasEmail ? (
               <button
                 onClick={sendEmail}
                 disabled={sending || sent === "sent"}
                 style={{
-                  background: sent === "sent" ? "#052e16" : sent === "failed" ? "#1c0a0a" : "#1e1b4b",
-                  border: `1px solid ${sent === "sent" ? "#4ade80" : sent === "failed" ? "#f87171" : "#6366f1"}`,
-                  color: sent === "sent" ? "#4ade80" : sent === "failed" ? "#f87171" : "#818cf8",
-                  fontFamily: "'IBM Plex Mono', monospace", fontSize: "10px",
-                  padding: "2px 10px", borderRadius: "3px",
-                  cursor: sending || sent === "sent" ? "not-allowed" : "pointer",
+                  background: sent === "sent" ? "#16a34a" : sent === "failed" ? "#dc2626" : "#10b981",
+                  color: "#ffffff", padding: "8px 16px", borderRadius: "8px", border: "none", fontSize: "13px",
+                  fontWeight: 600, display: "flex", alignItems: "center", gap: "8px", cursor: sending || sent === "sent" ? "not-allowed" : "pointer",
+                  boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)", transition: "all 0.2s"
                 }}
               >
-                {sending ? "sending..." : sent === "sent" ? "✓ sent" : sent === "failed" ? "✗ failed" : "send this"}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                {sending ? "Sending..." : sent === "sent" ? "Sent ✓" : sent === "failed" ? "Failed ✗" : "Send Email"}
               </button>
-            )}
-            {!hasEmail && (
-              <span style={{ fontSize: "10px", color: "#374151" }}>no email — send manually via LinkedIn</span>
+            ) : (
+              <span style={{ fontSize: "12px", color: "#64748b", fontStyle: "italic" }}>Send manually via LinkedIn</span>
             )}
           </div>
         </div>
@@ -310,23 +304,27 @@ function Skeletons() {
     <>
       {Array.from({ length: 10 }).map((_, i) => (
         <div key={i} style={{
-          border: "1px solid #1f2937", borderLeft: "3px solid #374151",
-          marginBottom: "8px", background: "#0a0e14", borderRadius: "4px",
-          height: "44px", display: "flex", alignItems: "center", padding: "0 14px",
-          animation: "pulse 1.5s infinite"
+          background: "#ffffff", border: "1px solid #eaedf3", borderLeft: "4px solid #cbd5e1",
+          marginBottom: "16px", borderRadius: "12px", height: "72px", display: "flex", alignItems: "center", padding: "0 20px",
+          animation: "skeletonPulse 1.5s infinite", boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
         }}>
-          <div style={{ width: "20px", height: "12px", background: "#1f2937", borderRadius: "2px", marginRight: "12px" }} />
-          <div style={{ width: "120px", height: "12px", background: "#1f2937", borderRadius: "2px" }} />
-          <div style={{ width: "80px", height: "10px", background: "#111827", borderRadius: "2px", marginLeft: "12px" }} />
+          <div style={{ width: "24px", height: "14px", background: "#f1f5f9", borderRadius: "4px", marginRight: "16px" }} />
+          <div>
+            <div style={{ width: "140px", height: "14px", background: "#f1f5f9", borderRadius: "4px", marginBottom: "8px" }} />
+            <div style={{ width: "80px", height: "10px", background: "#f8fafc", borderRadius: "4px" }} />
+          </div>
         </div>
       ))}
+      <style>{`
+        @keyframes skeletonPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+      `}</style>
     </>
   );
 }
 
 function PaginationBar({ page, totalPages, totalLeads, onPageChange }) {
   if (totalLeads === 0) {
-    return <div style={{ color: "#64748b", fontFamily: "'IBM Plex Mono', monospace", fontSize: "12px", padding: "20px 0", textAlign: "center", border: "1px dashed #1f2937", borderRadius: "4px", marginBottom: "16px" }}>No leads found for this search.</div>;
+    return <div style={{ color: "#64748b", fontSize: "14px", padding: "32px 0", textAlign: "center", border: "2px dashed #eaedf3", borderRadius: "12px", marginBottom: "20px" }}>No leads found for this search.</div>;
   }
 
   let start = Math.max(1, page - 2);
@@ -340,27 +338,25 @@ function PaginationBar({ page, totalPages, totalLeads, onPageChange }) {
   for (let i = start; i <= end; i++) pills.push(i);
 
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", background: "#0a0e14", padding: "10px 14px", borderRadius: "4px", border: "1px solid #111827", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        <span style={{ color: "#a5b4fc", fontWeight: 700 }}>Batch {page} of {totalPages}</span>
-        <span style={{ color: "#64748b" }}>•</span>
-        <span style={{ color: "#94a3b8" }}>{totalLeads} total leads</span>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", background: "#ffffff", padding: "12px 20px", borderRadius: "12px", border: "1px solid #eaedf3", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "16px", fontSize: "13px" }}>
+        <span style={{ color: "#4f46e5", fontWeight: 600 }}>Batch {page} of {totalPages}</span>
+        <span style={{ color: "#cbd5e1" }}>•</span>
+        <span style={{ color: "#64748b" }}>{totalLeads} total leads</span>
       </div>
       
-      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-        <button disabled={page === 1} onClick={() => onPageChange(page - 1)} style={{ background: "transparent", border: "1px solid #1f2937", color: page === 1 ? "#374151" : "#e2e8f0", padding: "4px 8px", borderRadius: "3px", cursor: page === 1 ? "not-allowed" : "pointer", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px" }}>Prev</button>
+      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        <button disabled={page === 1} onClick={() => onPageChange(page - 1)} style={{ background: "transparent", border: "1px solid #eaedf3", color: page === 1 ? "#cbd5e1" : "#64748b", padding: "6px 12px", borderRadius: "6px", cursor: page === 1 ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 500 }}>Prev</button>
         
         {pills.map(p => (
-           <button key={p} onClick={() => onPageChange(p)} style={{ background: p === page ? "#6366f1" : "transparent", color: p === page ? "#fff" : "#94a3b8", border: p === page ? "none" : "1px solid #1f2937", padding: "4px 8px", borderRadius: "3px", cursor: "pointer", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", minWidth: "28px" }}>{p}</button>
+           <button key={p} onClick={() => onPageChange(p)} style={{ background: p === page ? "#4f46e5" : "transparent", color: p === page ? "#ffffff" : "#64748b", border: p === page ? "1px solid #4f46e5" : "1px solid #eaedf3", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: p === page ? 600 : 500, minWidth: "32px", textAlign: "center" }}>{p}</button>
         ))}
 
-        <button disabled={page === totalPages} onClick={() => onPageChange(page + 1)} style={{ background: "transparent", border: "1px solid #1f2937", color: page === totalPages ? "#374151" : "#e2e8f0", padding: "4px 8px", borderRadius: "3px", cursor: page === totalPages ? "not-allowed" : "pointer", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px" }}>Next</button>
+        <button disabled={page === totalPages} onClick={() => onPageChange(page + 1)} style={{ background: "transparent", border: "1px solid #eaedf3", color: page === totalPages ? "#cbd5e1" : "#64748b", padding: "6px 12px", borderRadius: "6px", cursor: page === totalPages ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 500 }}>Next</button>
       </div>
     </div>
   );
 }
-
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [step, setStep]             = useState("form");
@@ -387,14 +383,11 @@ export default function App() {
   const [totalLeads, setTotalLeads] = useState(0);
   const [isPaginating, setIsPaginating] = useState(false);
 
-  // ── Agent Thinking Window state ───────────────────────────────────────────
   const [agentStep, setAgentStep] = useState(AGENT_STEP_IDS[0]);
   const [agentLead, setAgentLead] = useState("");
 
-  // Auto-advance steps every 1.2 s while the pipeline is running
   useEffect(() => {
     if (status !== STATUS.RUNNING) return;
-    // Reset to first step on every new run
     setAgentStep(AGENT_STEP_IDS[0]);
     setAgentLead("");
     let idx = 0;
@@ -403,20 +396,17 @@ export default function App() {
       if (idx < AGENT_STEP_IDS.length - 1) {
         setAgentStep(AGENT_STEP_IDS[idx]);
       } else {
-        // Stay on the last "active" step until the run actually finishes
         clearInterval(timer);
       }
     }, 1200);
     return () => clearInterval(timer);
-  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status]);
 
-  // Snap to "ready" as soon as the run completes
   useEffect(() => {
     if (status === STATUS.DONE || status === STATUS.ERROR) {
       setAgentStep("ready");
     }
   }, [status]);
-  // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
 
@@ -492,7 +482,6 @@ export default function App() {
         `✅ ${data.prospects_found} prospects found`,
         `✅ ${data.outreach_targets?.length ?? 0} emails drafted`,
       ]);
-      // Save to history
       setHistory(prev => {
         const next = [{
           id: Date.now(),
@@ -521,7 +510,6 @@ export default function App() {
   const refineAndRerun = () => {
     setStep("form");
     setStatus(STATUS.IDLE);
-    // Reset agent panel so it starts fresh on the next run
     setAgentStep(AGENT_STEP_IDS[0]);
     setAgentLead("");
   };
@@ -545,227 +533,247 @@ export default function App() {
     runCampaign(entry.filters, entry.seeking, entry.senderName);
   };
 
-  // ── FORM ─────────────────────────────────────────────────────────────────────
   const FormStep = () => (
-    <div style={{ maxWidth: "760px", margin: "0 auto", padding: "40px 24px" }}>
-      <div style={{ marginBottom: "28px" }}>
-        <div style={{ fontSize: "18px", fontWeight: 700, color: "#f1f5f9", marginBottom: "4px", fontFamily: "'IBM Plex Mono', monospace" }}>
-          Build Your Lead Filter
-        </div>
-        <div style={{ fontSize: "11px", color: "#475569", fontFamily: "'IBM Plex Mono', monospace" }}>
-          Fill in who you are + what you want → agent writes personalised outreach
-        </div>
+    <div style={{ maxWidth: "800px", margin: "0 auto", padding: "40px 24px" }}>
+      <div style={{ marginBottom: "32px", textAlign: "center" }}>
+        <h1 style={{ fontSize: "28px", fontWeight: 800, color: "#1e293b", margin: "0 0 8px 0", letterSpacing: "-0.02em" }}>
+          Build Your Campaign
+        </h1>
+        <p style={{ fontSize: "14px", color: "#64748b", margin: 0 }}>
+          Define who you are and who you want to reach. The AI will find leads and write highly-personalised emails.
+        </p>
       </div>
 
-      {/* Step 1 — About You */}
-      <div style={{ background: "#0a0e14", border: "1px solid #111827", borderLeft: "3px solid #6366f1", borderRadius: "6px", padding: "18px 20px", marginBottom: "14px" }}>
-        <div style={{ fontSize: "10px", color: "#6366f1", letterSpacing: "0.15em", marginBottom: "14px", fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700 }}>
-          STEP 1 — ABOUT YOU
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+      <div style={{ background: "#ffffff", borderRadius: "12px", padding: "32px", marginBottom: "24px", boxShadow: "0 4px 16px rgba(0,0,0,0.03)", border: "1px solid #eaedf3" }}>
+        <div style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b", marginBottom: "8px" }}>About You</div>
+        <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "24px" }}>Help the agent understand your value proposition.</div>
+        
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
           <div>
-            <label style={{ display: "block", fontSize: "10px", color: "#475569", letterSpacing: "0.1em", marginBottom: "5px", fontFamily: "'IBM Plex Mono', monospace" }}>
-              YOUR NAME
+            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#1e293b", marginBottom: "8px" }}>
+              Your Name
             </label>
             <input value={senderName} onChange={e => setSenderName(e.target.value)}
               placeholder="e.g. Parth"
-              style={{ width: "100%", background: "#060912", border: "1px solid #1f2937", borderRadius: "4px", color: "#e2e8f0", fontFamily: "'IBM Plex Mono', monospace", fontSize: "12px", padding: "8px 10px", outline: "none", boxSizing: "border-box" }}
-              onFocus={e => e.target.style.borderColor = "#6366f1"}
-              onBlur={e => e.target.style.borderColor = "#1f2937"}
+              style={{ width: "100%", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", color: "#1e293b", fontSize: "14px", padding: "12px 14px", outline: "none", boxSizing: "border-box", transition: "all 0.2s" }}
+              onFocus={e => { e.target.style.borderColor = "#c7d2fe"; e.target.style.background = "#ffffff"; }}
+              onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.background = "#f8fafc"; }}
             />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: "10px", color: "#475569", letterSpacing: "0.1em", marginBottom: "5px", fontFamily: "'IBM Plex Mono', monospace" }}>
-              WHAT ARE YOU SEEKING?
+            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#1e293b", marginBottom: "8px" }}>
+              What are you seeking?
             </label>
             <input value={seeking} onChange={e => setSeeking(e.target.value)}
-              placeholder="e.g. ML internship / freelance clients / pilot customers"
-              style={{ width: "100%", background: "#060912", border: "1px solid #1f2937", borderRadius: "4px", color: "#e2e8f0", fontFamily: "'IBM Plex Mono', monospace", fontSize: "12px", padding: "8px 10px", outline: "none", boxSizing: "border-box" }}
-              onFocus={e => e.target.style.borderColor = "#6366f1"}
-              onBlur={e => e.target.style.borderColor = "#1f2937"}
+              placeholder="e.g. ML internship, pilot customers..."
+              style={{ width: "100%", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", color: "#1e293b", fontSize: "14px", padding: "12px 14px", outline: "none", boxSizing: "border-box", transition: "all 0.2s" }}
+              onFocus={e => { e.target.style.borderColor = "#c7d2fe"; e.target.style.background = "#ffffff"; }}
+              onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.background = "#f8fafc"; }}
             />
           </div>
         </div>
       </div>
 
-      {/* Step 2 — Target Filters */}
-      <div style={{ background: "#0a0e14", border: "1px solid #111827", borderLeft: "3px solid #4338ca", borderRadius: "6px", padding: "18px 20px", marginBottom: "14px" }}>
-        <div style={{ fontSize: "10px", color: "#818cf8", letterSpacing: "0.15em", marginBottom: "14px", fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700 }}>
-          STEP 2 — TARGET LEADS
-        </div>
-        <ChipGroup label="ROLE / JOB TITLE" options={ROLES} selected={filters.roles} onChange={updateFilter("roles")} />
-        <ChipGroup label="INDUSTRY" options={INDUSTRIES} selected={filters.industries} onChange={updateFilter("industries")} />
-        <ChipGroup label="LOCATION" options={LOCATIONS} selected={filters.locations} onChange={updateFilter("locations")} />
-        <ChipGroup label="COMPANY SIZE" options={COMPANY_SIZES} selected={filters.companySizes} onChange={updateFilter("companySizes")} />
-        <div>
-          <div style={{ fontSize: "10px", color: "#475569", letterSpacing: "0.12em", marginBottom: "6px", fontFamily: "'IBM Plex Mono', monospace" }}>KEYWORDS (optional)</div>
+      <div style={{ background: "#ffffff", borderRadius: "12px", padding: "32px", marginBottom: "24px", boxShadow: "0 4px 16px rgba(0,0,0,0.03)", border: "1px solid #eaedf3" }}>
+        <div style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b", marginBottom: "8px" }}>Target Leads</div>
+        <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "24px" }}>Select the demographics of your ideal prospects.</div>
+        
+        <ChipGroup label="Role / Job Title" options={ROLES} selected={filters.roles} onChange={updateFilter("roles")} />
+        <ChipGroup label="Industry" options={INDUSTRIES} selected={filters.industries} onChange={updateFilter("industries")} />
+        <ChipGroup label="Location" options={LOCATIONS} selected={filters.locations} onChange={updateFilter("locations")} />
+        <ChipGroup label="Company Size" options={COMPANY_SIZES} selected={filters.companySizes} onChange={updateFilter("companySizes")} />
+        
+        <div style={{ marginTop: "8px" }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#1e293b", marginBottom: "8px" }}>
+            Additional Keywords (Optional)
+          </label>
           <input value={filters.keywords} onChange={e => setFilters(f => ({ ...f, keywords: e.target.value }))}
             placeholder="e.g. Series A, B2B, actively hiring..."
-            style={{ width: "100%", background: "#060912", border: "1px solid #1f2937", borderRadius: "4px", color: "#e2e8f0", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", padding: "7px 10px", outline: "none", boxSizing: "border-box" }}
-            onFocus={e => e.target.style.borderColor = "#6366f1"}
-            onBlur={e => e.target.style.borderColor = "#1f2937"}
+            style={{ width: "100%", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", color: "#1e293b", fontSize: "14px", padding: "12px 14px", outline: "none", boxSizing: "border-box", transition: "all 0.2s" }}
+            onFocus={e => { e.target.style.borderColor = "#c7d2fe"; e.target.style.background = "#ffffff"; }}
+            onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.background = "#f8fafc"; }}
           />
         </div>
       </div>
 
-      {/* Goal Preview */}
       {canRun && (
-        <div style={{ background: "#0d1117", border: "1px solid #1f2937", borderLeft: "3px solid #4ade80", borderRadius: "4px", padding: "10px 14px", marginBottom: "16px", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", color: "#64748b" }}>
-          <span style={{ color: "#4ade80", marginRight: "8px" }}>GOAL →</span>
+        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderLeft: "4px solid #10b981", borderRadius: "8px", padding: "16px", marginBottom: "24px", fontSize: "13px", color: "#475569", lineHeight: "1.6" }}>
+          <span style={{ color: "#10b981", fontWeight: 700, marginRight: "8px" }}>Directive →</span>
           {filtersToGoal(filters, seeking, senderName)}
         </div>
       )}
 
-      {/* Warnings */}
-      {!senderName.trim() && <div style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "'IBM Plex Mono', monospace", marginBottom: "6px" }}>⚠ Enter your name</div>}
-      {!seeking.trim() && <div style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "'IBM Plex Mono', monospace", marginBottom: "6px" }}>⚠ Enter what you're seeking</div>}
-      {!hasFilters && <div style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "'IBM Plex Mono', monospace", marginBottom: "6px" }}>⚠ Select at least one filter</div>}
-
-      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+        {!canRun && (
+          <div style={{ fontSize: "12px", color: "#94a3b8", display: "flex", gap: "16px" }}>
+            {!senderName.trim() && <span>⚠ Missing Name</span>}
+            {!seeking.trim() && <span>⚠ Missing Goal</span>}
+            {!hasFilters && <span>⚠ Missing Filters</span>}
+          </div>
+        )}
         <button onClick={() => runCampaign()} disabled={!canRun} style={{
-          padding: "11px 28px", background: canRun ? "#4338ca" : "#1e1b4b",
-          color: canRun ? "#e0e7ff" : "#4b5563", border: "none", borderRadius: "4px",
-          cursor: canRun ? "pointer" : "not-allowed", fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: "12px", fontWeight: 700, letterSpacing: "0.05em",
+          padding: "14px 40px", background: canRun ? "#4f46e5" : "#e2e8f0",
+          color: canRun ? "#ffffff" : "#94a3b8", border: "none", borderRadius: "999px",
+          cursor: canRun ? "pointer" : "not-allowed", fontSize: "15px", fontWeight: 600,
+          boxShadow: canRun ? "0 4px 12px rgba(79, 70, 229, 0.2)" : "none", transition: "all 0.2s"
         }}>
-          GENERATE LEADS →
+          Generate Leads
         </button>
       </div>
     </div>
   );
 
-  // ── RESULTS ───────────────────────────────────────────────────────────────────
   const ResultsStep = () => (
-    <div style={{ maxWidth: "900px", margin: "0 auto", padding: "32px 24px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+    <div style={{ maxWidth: "960px", margin: "0 auto", padding: "32px 24px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
         <button onClick={refineAndRerun} style={{
-          background: "transparent", border: "1px solid #1f2937", borderRadius: "4px",
-          color: "#475569", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px",
-          padding: "5px 12px", cursor: "pointer",
-        }}>
+          background: "#ffffff", border: "1px solid #eaedf3", borderRadius: "8px",
+          color: "#475569", fontSize: "13px", fontWeight: 600, padding: "8px 16px", cursor: "pointer",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.02)", transition: "all 0.2s", display: "flex", alignItems: "center", gap: "8px"
+        }} onMouseEnter={e => e.target.style.background = "#f8fafc"} onMouseLeave={e => e.target.style.background = "#ffffff"}>
           ← Refine Filters
         </button>
         {result && (
           <button onClick={() => exportCSV(result.outreach_targets || [])} style={{
-            background: "#0d1117", border: "1px solid #1f2937", borderRadius: "4px",
-            color: "#64748b", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px",
-            padding: "5px 12px", cursor: "pointer",
-          }}>
-            export CSV ↓
+            background: "#ffffff", border: "1px solid #eaedf3", borderRadius: "8px",
+            color: "#475569", fontSize: "13px", fontWeight: 600, padding: "8px 16px", cursor: "pointer",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.02)", transition: "all 0.2s", display: "flex", alignItems: "center", gap: "8px"
+          }} onMouseEnter={e => e.target.style.background = "#f8fafc"} onMouseLeave={e => e.target.style.background = "#ffffff"}>
+            Export CSV ↓
           </button>
         )}
       </div>
 
-      {/* Logs */}
-      {logs.length > 0 && (
-        <div style={{ background: "#0a0e14", border: "1px solid #111827", borderRadius: "4px", padding: "10px 14px", maxHeight: "110px", overflowY: "auto", marginBottom: "20px" }}>
-          {logs.map((line, i) => (
-            <div key={i} style={{ color: line.startsWith("⚠") ? "#f87171" : line.startsWith("✅") ? "#4ade80" : "#374151", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", lineHeight: "1.6" }}>{line}</div>
-          ))}
-          {isRunning && (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
-              <span style={{ display: "inline-block", width: "9px", height: "9px", border: "2px solid #6366f1", borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-              <span style={{ color: "#6366f1", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px" }}>Pipeline running...</span>
-            </div>
-          )}
-          <div ref={logsEndRef} />
-        </div>
-      )}
-
-      {/* ── Agent Thinking Window — shown whenever we are in results view ── */}
       {(isRunning || status === STATUS.DONE || status === STATUS.ERROR) && (
         <AgentWindow currentStep={agentStep} activeLead={agentLead} />
       )}
-      {/* ─────────────────────────────────────────────────────────────────── */}
 
       {error && (
-        <div style={{ background: "#1c0a0a", border: "1px solid #7f1d1d", borderRadius: "4px", padding: "10px 14px", color: "#f87171", fontSize: "11px", marginBottom: "16px", fontFamily: "'IBM Plex Mono', monospace" }}>
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "12px", padding: "16px 20px", color: "#dc2626", fontSize: "14px", fontWeight: 500, marginBottom: "24px", display: "flex", alignItems: "center", gap: "10px" }}>
           ⚠️ {error}
         </div>
       )}
 
       {result && (
-        <div>
-          {/* Stats bar */}
-          <div style={{ display: "flex", gap: "20px", marginBottom: "16px", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px" }}>
-            <span style={{ color: "#4ade80" }}>✅ {result.outreach_targets?.filter(t => t.prospect?.email).length ?? 0} with email</span>
-            <span style={{ color: "#818cf8" }}>📋 {result.prospects_found} total prospects</span>
-            <span style={{ color: "#64748b" }}>✉️ {result.outreach_targets?.length ?? 0} emails drafted</span>
-          </div>
+        <div style={{ animation: "fadeIn 0.5s ease" }}>
+          <div style={{ background: "#ffffff", borderRadius: "12px", padding: "24px", marginBottom: "32px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #eaedf3" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px" }}>
+              <div>
+                <div style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b" }}>Campaign Progress</div>
+                <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>Session: {SESSION_ID.slice(0, 8)}</div>
+              </div>
+              <span style={{ background: "#dcfce7", color: "#166534", padding: "6px 14px", borderRadius: "999px", fontSize: "12px", fontWeight: 600 }}>{status === STATUS.DONE ? "Completed" : "Running"}</span>
+            </div>
 
-          {/* Tabs */}
-          <div style={{ display: "flex", borderBottom: "1px solid #1f2937", marginBottom: "14px" }}>
-            {["emails", "raw"].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} style={{
-                padding: "6px 16px", background: "transparent", border: "none",
-                borderBottom: activeTab === tab ? "2px solid #6366f1" : "2px solid transparent",
-                color: activeTab === tab ? "#a5b4fc" : "#475569",
-                fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px",
-                cursor: "pointer", textTransform: "uppercase", fontWeight: activeTab === tab ? 700 : 400, marginBottom: "-1px",
-              }}>
-                {tab === "emails" ? `emails (${result.outreach_targets?.length ?? 0})` : "raw json"}
-              </button>
-            ))}
-          </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", fontWeight: 600, color: "#1e293b", marginBottom: "12px" }}>
+              <span>Overall Progress</span>
+              <span>{status === STATUS.DONE ? "100%" : (status === STATUS.RUNNING ? "50%" : "0%")}</span>
+            </div>
+            
+            <div style={{ width: "100%", height: "8px", background: "#f1f5f9", borderRadius: "999px", marginBottom: "32px", overflow: "hidden" }}>
+              <div style={{ width: status === STATUS.DONE ? "100%" : (status === STATUS.RUNNING ? "50%" : "0%"), height: "100%", background: "#0f172a", borderRadius: "999px", transition: "width 0.8s ease" }} />
+            </div>
 
-          {activeTab === "emails" && (
-            <>
-              <PaginationBar page={page} totalPages={totalPages} totalLeads={totalLeads} onPageChange={fetchPage} />
-              
-              {isPaginating ? <Skeletons /> : result.outreach_targets?.map((item, i) => (
-                <EmailCard key={i} item={item} index={(page - 1) * 10 + i} sessionId={SESSION_ID} prospectId={(page - 1) * 10 + i} />
-              ))}
-
-              {!isPaginating && result.outreach_targets?.length > 0 && totalPages > 1 && (
-                <div style={{ marginTop: "16px" }}>
-                  <PaginationBar page={page} totalPages={totalPages} totalLeads={totalLeads} onPageChange={fetchPage} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              <div style={{ background: "#f8fafc", border: "1px solid #eaedf3", padding: "20px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "16px" }}>
+                <div style={{ background: "#dcfce7", borderRadius: "50%", minWidth: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                 </div>
-              )}
-            </>
-          )}
+                <div>
+                  <div style={{ fontSize: "15px", fontWeight: 600, color: "#1e293b" }}>Prospects Found</div>
+                  <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>{result.prospects_found || 0} prospects identified</div>
+                </div>
+              </div>
+              <div style={{ background: "#f8fafc", border: "1px solid #eaedf3", padding: "20px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "16px" }}>
+                <div style={{ background: "#dcfce7", borderRadius: "50%", minWidth: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: "15px", fontWeight: 600, color: "#1e293b" }}>Emails Drafted</div>
+                  <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>{result.outreach_targets?.length ?? 0} emails ready to send</div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-          {activeTab === "raw" && (
-            <pre style={{ background: "#0a0e14", border: "1px solid #111827", borderRadius: "4px", padding: "16px", color: "#64748b", fontSize: "11px", lineHeight: "1.7", overflowX: "auto", maxHeight: "600px", overflowY: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          )}
+          <div style={{ background: "#ffffff", borderRadius: "12px", padding: "24px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #eaedf3" }}>
+            <div style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b", marginBottom: "4px" }}>Generated Emails</div>
+            <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "20px" }}>{result.prospects_found || 0} prospects found</div>
+
+            <div style={{ display: "flex", gap: "10px", marginBottom: "24px" }}>
+              {["emails", "raw"].map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)} style={{
+                  padding: "8px 18px", background: activeTab === tab ? "#1e293b" : "#ffffff",
+                  border: activeTab === tab ? "1px solid #1e293b" : "1px solid #eaedf3",
+                  borderRadius: "999px", color: activeTab === tab ? "#ffffff" : "#64748b",
+                  fontSize: "13px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s"
+                }}>
+                  {tab === "emails" ? `Emails (${result.outreach_targets?.length ?? 0})` : "Raw JSON"}
+                </button>
+              ))}
+            </div>
+
+            {activeTab === "emails" && (
+              <>
+                <PaginationBar page={page} totalPages={totalPages} totalLeads={totalLeads} onPageChange={fetchPage} />
+                <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+                  {isPaginating ? <Skeletons /> : result.outreach_targets?.map((item, i) => (
+                    <EmailCard key={i} item={item} index={(page - 1) * 10 + i} sessionId={SESSION_ID} prospectId={(page - 1) * 10 + i} />
+                  ))}
+                </div>
+                {!isPaginating && result.outreach_targets?.length > 0 && totalPages > 1 && (
+                  <div style={{ marginTop: "16px" }}>
+                    <PaginationBar page={page} totalPages={totalPages} totalLeads={totalLeads} onPageChange={fetchPage} />
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === "raw" && (
+              <pre style={{ background: "#f8fafc", border: "1px solid #eaedf3", borderRadius: "8px", padding: "20px", color: "#334155", fontSize: "13px", lineHeight: "1.6", overflowX: "auto", maxHeight: "600px", overflowY: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                {JSON.stringify(result, null, 2)}
+              </pre>
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#060912", color: "#e2e8f0" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#f5f6fa", color: "#1e293b", fontFamily: "Inter, -apple-system, sans-serif" }}>
       <div style={{ position: "sticky", top: 0, height: "100vh", display: "flex" }}>
         <Sidebar history={history} onView={loadFromHistory} onRerun={rerunFromHistory} />
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Header */}
-        <div style={{ borderBottom: "1px solid #111827", padding: "14px 28px", display: "flex", alignItems: "center", gap: "10px", background: "#070b10" }}>
-        <div style={{
-          width: "7px", height: "7px", borderRadius: "50%",
-          background: status === STATUS.RUNNING ? "#f59e0b" : status === STATUS.DONE ? "#4ade80" : status === STATUS.ERROR ? "#f87171" : "#6366f1",
-          animation: isRunning ? "pulse 1s infinite" : "none",
-        }} />
-        <span style={{ fontSize: "11px", color: "#64748b", letterSpacing: "0.15em", fontFamily: "'IBM Plex Mono', monospace" }}>OUTREACH AGENT</span>
-        {senderName && <span style={{ fontSize: "11px", color: "#374151", fontFamily: "'IBM Plex Mono', monospace" }}>/ {senderName}</span>}
-        {seeking && <span style={{ fontSize: "11px", color: "#1e1b4b", fontFamily: "'IBM Plex Mono', monospace" }}>→ {seeking}</span>}
-        <span style={{ marginLeft: "auto", fontSize: "10px", color: "#1f2937", fontFamily: "'IBM Plex Mono', monospace" }}>{SESSION_ID.slice(0, 8)}</span>
-      </div>
+        <div style={{ borderBottom: "1px solid #eaedf3", padding: "16px 32px", display: "flex", alignItems: "center", gap: "12px", background: "#ffffff", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
+          <div style={{
+            width: "8px", height: "8px", borderRadius: "50%",
+            background: status === STATUS.RUNNING ? "#f59e0b" : status === STATUS.DONE ? "#10b981" : status === STATUS.ERROR ? "#ef4444" : "#4f46e5",
+            animation: isRunning ? "pulse 1.5s infinite" : "none",
+          }} />
+          <span style={{ fontSize: "14px", fontWeight: 700, color: "#1e293b", letterSpacing: "0.05em" }}>OUTREACH AGENT</span>
+          {senderName && <span style={{ fontSize: "14px", color: "#64748b" }}>/ {senderName}</span>}
+          {seeking && <span style={{ fontSize: "14px", color: "#4f46e5", fontWeight: 500 }}>→ {seeking}</span>}
+          <span style={{ marginLeft: "auto", fontSize: "12px", color: "#94a3b8", fontWeight: 500 }}>{SESSION_ID.slice(0, 8)}</span>
+        </div>
 
-      {step === "form" ? <FormStep /> : <ResultsStep />}
+        {step === "form" ? <FormStep /> : <ResultsStep />}
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
-        body { margin: 0; background: #060912; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #0a0e14; }
-        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 2px; }
+        body { margin: 0; background: #f5f6fa; font-family: 'Inter', -apple-system, sans-serif; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        input::placeholder { color: #94a3b8; }
       `}</style>
     </div>
   );
