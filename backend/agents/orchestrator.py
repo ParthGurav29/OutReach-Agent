@@ -10,73 +10,51 @@ from backend.tools.scorer import score_prospect
 from backend.tools.drafter import draft_email
 
 
-# -----------------------------
-# Adaptive Loop Config
-# -----------------------------
-
-MAX_RETRIES = 2
+MAX_RETRIES    = 2
 MIN_GOOD_PROSPECTS = 5
-SCORE_THRESHOLD = 60
+SCORE_THRESHOLD    = 60
 
 
 def _profile_slug(url: str) -> str | None:
-    """
-    Extract the LinkedIn profile slug from a URL.
-    linkedin.com/in/john-smith-123 → john-smith-123
-    Handles both linkedin.com and in.linkedin.com variants.
-    """
     match = re.search(r"linkedin\.com/in/([^/?#]+)", url or "")
     return match.group(1).lower() if match else None
 
 
-async def plan_campaign(goal: str, session_id: str, sender_name: str = ""):
+async def plan_campaign(goal: str, session_id: str, sender_name: str = "", seeking: str = ""):
 
     print("\n🚀 Running campaign")
     print("Goal:", goal)
-    print("Sender:", sender_name)
+    print("Sender:", sender_name, "| Seeking:", seeking)
 
     memory_context = build_memory_context(session_id)
-    print(memory_context)
-
     session = get_session(session_id)
 
-    # -----------------------------
-    # STEP 1 — Generate Campaign Plan
-    # -----------------------------
-
+    # STEP 1 — Plan
     plan = await generate_campaign_plan(goal, memory_context)
-
-    print("\n📋 Campaign Plan Generated:\n")
-    print(plan)
 
     if not plan or "campaign_plan" not in plan:
         print("⚠️ No campaign plan generated")
         return {}
 
-    campaign_plan = plan["campaign_plan"]
+    campaign_plan  = plan["campaign_plan"]
     search_queries = campaign_plan.get("search_queries", [])
 
     if not search_queries:
         print("⚠️ No search queries generated")
         return {}
 
-    # -----------------------------
-    # ADAPTIVE SEARCH LOOP
-    # -----------------------------
-
-    retry_count = 0
-    seen_slugs = set()         # deduplicate by LinkedIn profile slug
-    seen_urls  = set()         # fallback dedup for non-LinkedIn URLs
+    retry_count        = 0
+    seen_slugs         = set()
+    seen_urls          = set()
     all_scored_results = []
 
     while True:
 
-        print("\n==============================")
-        print(f"🔎 RUNNING SEARCH QUERIES (attempt {retry_count + 1})")
+        print(f"\n==============================")
+        print(f"🔎 SEARCH QUERIES (attempt {retry_count + 1})")
         print("==============================")
 
         all_results = []
-
         for query in search_queries[:5]:
             print(f"🔍 {query}")
             results = await search_web(query)
@@ -84,12 +62,11 @@ async def plan_campaign(goal: str, session_id: str, sender_name: str = ""):
                 print(r)
             all_results.extend(results)
 
-        # Deduplicate — by profile slug first, then URL
+        # Dedup by LinkedIn slug, fallback to URL
         new_results = []
         for r in all_results:
             url  = r.get("url", "")
             slug = _profile_slug(url)
-
             if slug:
                 if slug not in seen_slugs:
                     seen_slugs.add(slug)
@@ -99,32 +76,23 @@ async def plan_campaign(goal: str, session_id: str, sender_name: str = ""):
                     seen_urls.add(url)
                     new_results.append(r)
 
-        print(f"\nNEW UNIQUE RESULTS THIS ROUND: {len(new_results)}")
-        print(f"TOTAL SEEN SO FAR: {len(seen_slugs) + len(seen_urls)}\n")
+        print(f"\nNEW UNIQUE: {len(new_results)} | TOTAL SEEN: {len(seen_slugs) + len(seen_urls)}\n")
 
         if not new_results:
-            print("⚠️ No new results this round — skipping extract/score")
+            print("⚠️ No new results — skipping")
         else:
-            # -----------------------------
-            # STEP 4 — Extract Prospects
-            # -----------------------------
-
+            # STEP 4 — Extract
             print("\n🧠 Extracting prospects...\n")
-
-            extraction_tasks = [extract_prospect(r) for r in new_results]
-            extracted = await asyncio.gather(*extraction_tasks)
+            extracted = await asyncio.gather(*[extract_prospect(r) for r in new_results])
             prospects = [p for p in extracted if p]
 
             for p in prospects:
-                print("✅ Prospect:", p)
+                print("✅", p)
 
-            print(f"\nPROSPECTS THIS ROUND: {len(prospects)}\n")
+            print(f"\nPROSPECTS: {len(prospects)}\n")
 
             if prospects:
-                # -----------------------------
-                # STEP 4.5 — Find Emails
-                # -----------------------------
-
+                # STEP 4.5 — Find emails
                 print("\n📬 Finding emails...\n")
 
                 async def enrich(p):
@@ -143,26 +111,18 @@ async def plan_campaign(goal: str, session_id: str, sender_name: str = ""):
 
                 resolved   = [p for p in enriched if p.get("email")]
                 unresolved = [p for p in enriched if not p.get("email")]
-                print(f"✅ Emails found:  {len(resolved)}")
-                print(f"❌ Unresolved:    {len(unresolved)}")
+                print(f"✅ Emails found: {len(resolved)} | ❌ Unresolved: {len(unresolved)}")
 
-                # -----------------------------
-                # STEP 5 — Score Prospects
-                # -----------------------------
-
-                print("\n🎯 Scoring prospects...\n")
-
-                scoring_tasks = [score_prospect(goal, p) for p in enriched]
-                scored = await asyncio.gather(*scoring_tasks)
+                # STEP 5 — Score
+                print("\n🎯 Scoring...\n")
+                scored = await asyncio.gather(*[score_prospect(goal, p) for p in enriched])
                 scored = [r for r in scored if r["score"] is not None]
-
                 all_scored_results.extend(scored)
 
-        # Sort + deduplicate by name across retries
+        # Sort + dedup by name
         all_scored_results.sort(key=lambda x: x["score"], reverse=True)
-
         seen_names = set()
-        deduped = []
+        deduped    = []
         for r in all_scored_results:
             name = r["prospect"].get("name")
             if name and name not in seen_names:
@@ -170,84 +130,60 @@ async def plan_campaign(goal: str, session_id: str, sender_name: str = ""):
                 deduped.append(r)
         all_scored_results = deduped
 
-        print("\n==============================")
-        print("🏆 TOP SCORED PROSPECTS (cumulative)")
-        print("==============================\n")
-
+        print("\n🏆 TOP PROSPECTS\n")
         for r in all_scored_results[:10]:
             p = r["prospect"]
-            email_status = f"📧 {p.get('email')}" if p.get("email") else "❌ no email"
-            print(f"{r['score']} — {p.get('name')} ({p.get('role')}) | {email_status}")
+            email_tag = f"📧 {p.get('email')}" if p.get("email") else "❌ no email"
+            print(f"{r['score']} — {p.get('name')} ({p.get('role')}) | {email_tag}")
 
-        good_prospects = [r for r in all_scored_results if r["score"] >= SCORE_THRESHOLD]
-        print(f"\n⭐ Prospects scoring ≥ {SCORE_THRESHOLD}: {len(good_prospects)}")
+        good = [r for r in all_scored_results if r["score"] >= SCORE_THRESHOLD]
+        print(f"\n⭐ Scoring ≥ {SCORE_THRESHOLD}: {len(good)}")
 
-        if len(good_prospects) >= MIN_GOOD_PROSPECTS:
+        if len(good) >= MIN_GOOD_PROSPECTS:
             print("✅ Quality threshold met.")
             break
 
         if retry_count >= MAX_RETRIES:
-            print(f"⚠️ Max retries reached. Using best {len(all_scored_results)} results.")
+            print(f"⚠️ Max retries reached.")
             break
 
-        print("\n⚡ Low quality results. Adapting search strategy...")
-
-        feedback = """
-Previous searches returned poor results.
-Generate COMPLETELY DIFFERENT queries — different job titles,
-different seniority levels, different industries or platforms.
-Do NOT repeat any query from before.
-"""
-
-        plan = await generate_campaign_plan(goal, memory_context + "\n" + feedback)
-        campaign_plan = plan.get("campaign_plan", {})
+        print("\n⚡ Adapting strategy...")
+        feedback = "\nPrevious searches returned poor results. Generate COMPLETELY DIFFERENT queries.\n"
+        plan = await generate_campaign_plan(goal, memory_context + feedback)
+        campaign_plan  = plan.get("campaign_plan", {})
         search_queries = campaign_plan.get("search_queries", search_queries)
-        retry_count += 1
-
-        print(f"\n🔁 Retry #{retry_count}")
-        print("New queries:", search_queries)
+        retry_count   += 1
+        print(f"🔁 Retry #{retry_count} | Queries: {search_queries}")
 
     scored_results = all_scored_results
 
     if not scored_results:
-        print("⚠️ No prospects found.")
         return {"prospects_found": 0, "outreach_targets": []}
 
-    # -----------------------------
-    # STEP 6 — Draft Emails
-    # -----------------------------
-
-    print("\n✉️ Generating outreach emails...\n")
-
+    # STEP 6 — Draft emails
+    print("\n✉️ Drafting emails...\n")
     tone = campaign_plan.get("tone", "friendly and professional")
 
-    draft_tasks = [
-        draft_email(r["prospect"], goal, tone, sender_name)
+    emails = await asyncio.gather(*[
+        draft_email(r["prospect"], goal, tone, sender_name, seeking)
         for r in scored_results[:10]
-    ]
-
-    emails = await asyncio.gather(*draft_tasks)
+    ])
 
     print(f"✅ {len(emails)} emails drafted")
 
     for i, email in enumerate(emails):
-        prospect = scored_results[i]["prospect"]
-        print("\n-----")
-        print("Prospect:", prospect.get("name"))
-        print("Email address:", prospect.get("email") or "not found")
-        print("Subject:", email.get("subject"))
-        print("Personalisation:", email.get("personalisation_used"))
-        print("Word count:", email.get("word_count"))
-        print("Email:")
+        p = scored_results[i]["prospect"]
+        print(f"\n-----")
+        print(f"Prospect: {p.get('name')} | Email: {p.get('email') or 'not found'}")
+        print(f"Subject: {email.get('subject')}")
+        print(f"Personalisation: {email.get('personalisation_used')}")
+        print(f"Word count: {email.get('word_count')}")
         print(email.get("body"))
 
-    outreach_results = []
-    for i, result in enumerate(scored_results[:10]):
-        outreach_results.append({
-            "prospect": result["prospect"],
-            "score": result["score"],
-            "email": emails[i]
-        })
+    outreach_results = [
+        {"prospect": scored_results[i]["prospect"], "score": scored_results[i]["score"], "email": emails[i]}
+        for i in range(len(emails))
+    ]
 
     return {
         "prospects_found": len(scored_results),

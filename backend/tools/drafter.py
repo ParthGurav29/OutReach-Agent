@@ -13,14 +13,10 @@ AWS_REGION = os.getenv("AWS_REGION")
 
 if not MODEL_ID:
     raise ValueError("NOVA_MICRO_MODEL_ID not set")
-
 if not AWS_REGION:
     raise ValueError("AWS_REGION not set")
 
-bedrock = boto3.client(
-    "bedrock-runtime",
-    region_name=AWS_REGION
-)
+bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 
 
 async def call_model(prompt):
@@ -30,13 +26,8 @@ async def call_model(prompt):
         lambda: bedrock.invoke_model(
             modelId=MODEL_ID,
             body=json.dumps({
-                "messages": [
-                    {"role": "user", "content": [{"text": prompt}]}
-                ],
-                "inferenceConfig": {
-                    "maxTokens": 500,
-                    "temperature": 0.6
-                }
+                "messages": [{"role": "user", "content": [{"text": prompt}]}],
+                "inferenceConfig": {"maxTokens": 500, "temperature": 0.6}
             })
         )
     )
@@ -52,42 +43,49 @@ async def call_model(prompt):
         return None
 
 
-async def generate_variant(prospect, goal, tone, personal_context, sender_name):
+async def generate_variant(prospect, goal, tone, personal_context, sender_name, seeking):
+
+    # Build sender identity block
+    sender_identity = f"My name is {sender_name}" if sender_name else "I'm reaching out"
+    if seeking:
+        sender_identity += f" and I'm seeking {seeking}"
 
     prompt = f"""
-You are writing a cold outreach email ON BEHALF OF {sender_name}.
-Write in first person as {sender_name}. Sign off with "{sender_name}".
-NEVER use placeholders like [Your Name], [Name], [Company].
+You are writing a cold outreach email ON BEHALF OF {sender_name or "the sender"}.
+
+SENDER IDENTITY:
+{sender_identity}
 
 PROSPECT:
 Name: {prospect.get("name")}
 Role: {prospect.get("role")}
 Company: {prospect.get("company", "")}
 
-PERSONALISATION (use in FIRST sentence):
+PERSONALISATION CONTEXT (reference this in the FIRST sentence):
 {personal_context}
 
-GOAL:
+CAMPAIGN GOAL:
 {goal}
 
 TONE:
 {tone}
 
-RULES:
-1. First sentence MUST reference the personalisation context specifically.
+STRICT RULES:
+1. First sentence MUST reference the personalisation context — name a specific project, newsletter, company, or achievement.
 2. Subject MUST reference the personalisation context.
 3. NEVER use: "I hope this finds you well", "I noticed your background in", "Just reaching out", "I came across your profile".
-4. 80 to 120 words.
-5. End with one soft CTA.
-6. Sign off as "{sender_name}" only.
-7. Zero placeholders.
+4. The email must clearly state WHO the sender is and WHAT they are seeking — use the sender identity naturally.
+5. Body must be 80–120 words.
+6. End with ONE soft CTA.
+7. Sign off as "{sender_name}" only — no title, no placeholders.
+8. ZERO placeholders like [Your Name], [Company], [Position].
 
 Return ONLY valid JSON:
 
 {{
-  "subject": "...",
-  "body": "...",
-  "personalisation_used": "...",
+  "subject": "subject referencing personalisation context",
+  "body": "complete email signed as {sender_name}",
+  "personalisation_used": "exact detail from context referenced in first sentence",
   "word_count": <integer>
 }}
 """
@@ -98,7 +96,6 @@ Return ONLY valid JSON:
 
     result["word_count"] = len(result.get("body", "").split())
 
-    # Reject if placeholders snuck in
     body = result.get("body", "")
     if "[" in body or "]" in body:
         return None
@@ -106,13 +103,15 @@ Return ONLY valid JSON:
     return result
 
 
-async def expand_email(email, sender_name):
+async def expand_email(email_body, sender_name, seeking):
+    seek_line = f"seeking {seeking}" if seeking else ""
     prompt = f"""
-Rewrite this email. Written by {sender_name}.
+Rewrite this email. Written by {sender_name} {seek_line}.
 - 80 to 120 words
-- Same personalisation and subject
+- Keep same personalisation and subject
+- Make the sender's identity and ask clear
 - Sign off as "{sender_name}"
-- Zero placeholders
+- ZERO placeholders
 
 Return ONLY valid JSON:
 {{
@@ -123,7 +122,7 @@ Return ONLY valid JSON:
 }}
 
 EMAIL:
-{email}
+{email_body}
 """
     result = await call_model(prompt)
     if result:
@@ -131,7 +130,7 @@ EMAIL:
     return result
 
 
-async def draft_email(prospect: dict, goal: str, tone: str, sender_name: str = ""):
+async def draft_email(prospect: dict, goal: str, tone: str, sender_name: str = "", seeking: str = ""):
 
     personal_context = (
         prospect.get("personalisation_hook")
@@ -147,9 +146,8 @@ async def draft_email(prospect: dict, goal: str, tone: str, sender_name: str = "
     variants = []
 
     for _ in range(3):
-
         email = await generate_variant(
-            prospect, goal, tone, personal_context, sender_name
+            prospect, goal, tone, personal_context, sender_name, seeking
         )
 
         if not email:
@@ -158,8 +156,8 @@ async def draft_email(prospect: dict, goal: str, tone: str, sender_name: str = "
         wc = email.get("word_count", 0)
 
         if wc < 80:
-            print(f"⚠️ Email too short ({wc}) → expanding")
-            expanded = await expand_email(email["body"], sender_name)
+            print(f"⚠️ Email too short ({wc}w) → expanding")
+            expanded = await expand_email(email["body"], sender_name, seeking)
             if expanded:
                 email = expanded
                 email["word_count"] = len(email.get("body", "").split())
@@ -173,11 +171,9 @@ async def draft_email(prospect: dict, goal: str, tone: str, sender_name: str = "
 
         email["quality_review"] = review
 
-        print(f"\n🧪 QUALITY CHECK — {prospect.get('name')}")
-        print(review)
+        print(f"\n🧪 QUALITY — {prospect.get('name')} | score: {review.get('score', '?')}")
 
         if not review.get("passed"):
-            print(f"⚠️ Rewriting email for {prospect.get('name')}")
             rewritten = review.get("rewritten_email")
             if rewritten:
                 email["body"] = rewritten
@@ -185,20 +181,14 @@ async def draft_email(prospect: dict, goal: str, tone: str, sender_name: str = "
 
         variants.append(email)
 
-    best = None
-    best_score = -1
-
-    for v in variants:
-        score = v.get("quality_review", {}).get("score", 0)
-        if score > best_score:
-            best = v
-            best_score = score
+    best = max(variants, key=lambda v: v.get("quality_review", {}).get("score", 0)) if variants else None
 
     if not best:
+        seek_line = f"seeking {seeking}" if seeking else ""
         fallback_body = (
             f"Hi {prospect.get('name', 'there')},\n\n"
             f"I came across {personal_context} and wanted to reach out.\n\n"
-            f"I'm {sender_name} — {goal}.\n\n"
+            f"I'm {sender_name}{', ' + seek_line if seek_line else ''}. {goal}.\n\n"
             f"Would you be open to a quick chat?\n\n"
             f"{sender_name}"
         )

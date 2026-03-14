@@ -1,27 +1,17 @@
 from dotenv import load_dotenv
 load_dotenv()
 from backend.tools.gmail_sender import send_gmail
-import base64
-import pickle
 import traceback
-from datetime import datetime
-from email.mime.text import MIMEText
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from googleapiclient.discovery import build
 
 from backend.agents.orchestrator import plan_campaign
 from backend.session_store import update_session, get_session
 
 
 app = FastAPI(title="Outreach AI Agent")
-
-
-# -----------------------------
-# CORS
-# -----------------------------
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,25 +22,11 @@ app.add_middleware(
 )
 
 
-# -----------------------------
-# Request Models
-# -----------------------------
-
-class AnalyzeRequest(BaseModel):
-    company: str
-    website: str | None = None
-
-
-class SendRequest(BaseModel):
-    name: str
-    email: str
-    company: str
-    message: str
-
-
 class CampaignRequest(BaseModel):
     goal: str
     session_id: str
+    sender_name: str = ""
+    seeking: str = ""          # ← new
 
 
 class SendEmailRequest(BaseModel):
@@ -58,124 +34,77 @@ class SendEmailRequest(BaseModel):
     session_id: str
 
 
-# -----------------------------
-# Root endpoint
-# -----------------------------
-
 @app.get("/")
 def root():
     return {"status": "Backend running"}
 
 
-# -----------------------------
-# Analyze endpoint
-# -----------------------------
-
-@app.post("/analyze")
-def analyze_lead(data: AnalyzeRequest):
-
-    return {
-        "company": data.company,
-        "insight": "Company research placeholder",
-        "status": "analysis_complete"
-    }
-
-
-# -----------------------------
-# Send endpoint (placeholder)
-# -----------------------------
-
-@app.post("/send")
-def send_email(data: SendRequest):
-
-    return {
-        "email": data.email,
-        "status": "email_sent_simulation",
-        "message": data.message
-    }
-
-
-# -----------------------------
-# Run Campaign endpoint
-# -----------------------------
-
 @app.post("/run-campaign")
 async def run_campaign(data: CampaignRequest):
-
     print("\n▶ Starting campaign...")
     print("Goal:", data.goal)
+    print("Sender:", data.sender_name, "| Seeking:", data.seeking)
     print("Session:", data.session_id[:8] + "...")
 
     campaign = await plan_campaign(
         goal=data.goal,
-        session_id=data.session_id
+        session_id=data.session_id,
+        sender_name=data.sender_name,
+        seeking=data.seeking,       # ← passed through
     )
 
-    # store results in session memory
-    if campaign and "outreach_targets" in campaign:
+    outreach_targets = campaign.get("outreach_targets", [])
+
+    if campaign and outreach_targets:
         update_session(
             session_id=data.session_id,
             goal=data.goal,
-            new_prospects=campaign["outreach_targets"] # Reverted back to avoid the TypeError
+            new_prospects=outreach_targets
         )
+        session = get_session(data.session_id)
+        session["outreach_targets"] = outreach_targets
 
-    print(f"✅ Done — {len(campaign.get('outreach_targets', []))} prospects found")
+    print(f"✅ Done — {len(outreach_targets)} prospects found")
 
     return {
-        "prospects_found": len(campaign.get("outreach_targets", [])),
-        "outreach_targets": campaign.get("outreach_targets", [])
+        "prospects_found": campaign.get("prospects_found", len(outreach_targets)),
+        "outreach_targets": outreach_targets
     }
 
 
-# -----------------------------
-# Send Email via Gmail endpoint
-# -----------------------------
-
 @app.post("/send-email")
 def send_email_via_gmail(data: SendEmailRequest):
-    import traceback
     try:
-        print(f"\n📤 [START] Sending email to prospect #{data.prospect_id}...")
-        
+        print(f"\n📤 Sending email to prospect #{data.prospect_id}...")
+
         session = get_session(data.session_id)
-        prospects = session.get("outreach_targets", [])
+        targets = session.get("outreach_targets", [])
 
-        if data.prospect_id >= len(prospects):
-            return {"sent": False, "error": f"Invalid ID. Total prospects: {len(prospects)}"}
+        if data.prospect_id >= len(targets):
+            return {"sent": False, "error": f"Invalid prospect_id. Only {len(targets)} in session."}
 
-        prospect = prospects[data.prospect_id]
-        print(f"   🔍 [DEBUG] Prospect Data Type: {type(prospect)}")
+        target   = targets[data.prospect_id]
+        prospect = target.get("prospect", {})
+        to_email = prospect.get("email")
+        name     = prospect.get("name", "there")
 
-        email_data = prospect.get("email")
-        if not email_data:
-            return {"sent": False, "error": "No email draft found"}
+        print(f"   👤 {name} → {to_email}")
 
-        # Safely extract draft whether it's a string or dictionary
-        if isinstance(email_data, dict):
-            draft = email_data.get("body", str(email_data))
-        else:
-            draft = str(email_data)
-            
-        print(f"   📝 [DEBUG] Draft extracted (length: {len(draft)} chars)")
+        if not to_email:
+            return {"sent": False, "error": f"No email found for {name}."}
 
-        # Trigger the sender
-        result = send_gmail(
-            draft=draft,
-            to_email="337.parth.gurav@gmail.com"
-        )
+        email_draft = target.get("email", {})
+        body    = email_draft.get("body", "") if isinstance(email_draft, dict) else str(email_draft)
+        subject = email_draft.get("subject", "Quick hello") if isinstance(email_draft, dict) else "Quick hello"
 
-        print("✅ [SUCCESS] Email sent successfully!")
+        if not body:
+            return {"sent": False, "error": "Email body is empty"}
+
+        result = send_gmail(draft=body, to_email=to_email, subject=subject)
+        print("✅ Sent!")
         return result
 
     except Exception as e:
-        print("\n🚨 [CRITICAL ERROR] Email send failed!")
-        print(f"Error Type: {type(e).__name__}")
-        print(f"Error Message: {repr(e)}")  # repr() forces the error text to be visible
-        print("--- Full Traceback ---")
+        print("\n🚨 Send failed!")
         traceback.print_exc()
-        print("------------------------------------------\n")
-        
-        return {
-            "sent": False,
-            "error": repr(e)
-        }
+        return {"sent": False, "error": repr(e)}
