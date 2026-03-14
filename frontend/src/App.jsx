@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import AgentWindow from "./AgentWindow";
+import Sidebar from "./Sidebar";
 
 const SESSION_ID = crypto.randomUUID();
 const STATUS = { IDLE: "idle", RUNNING: "running", DONE: "done", ERROR: "error" };
@@ -371,8 +372,14 @@ export default function App() {
   const [error, setError]           = useState(null);
   const [logs, setLogs]             = useState([]);
   const [activeTab, setActiveTab]   = useState("emails");
-  const [history, setHistory]       = useState([]);
-  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory]       = useState(() => {
+    try {
+      const stored = localStorage.getItem("ag_campaign_history");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const logsEndRef = useRef(null);
   
   const [page, setPage]             = useState(1);
@@ -449,9 +456,11 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const runCampaign = async (overrideFilters) => {
+  const runCampaign = async (overrideFilters, overrideSeeking, overrideSender) => {
     const activeFilters = overrideFilters || filters;
-    const goal = filtersToGoal(activeFilters, seeking, senderName);
+    const activeSeeking = overrideSeeking !== undefined ? overrideSeeking : seeking;
+    const activeSender = overrideSender !== undefined ? overrideSender : senderName;
+    const goal = filtersToGoal(activeFilters, activeSeeking, activeSender);
     setStatus(STATUS.RUNNING);
     setStep("results");
     setResult(null);
@@ -459,7 +468,7 @@ export default function App() {
     setPage(1);
     setTotalPages(1);
     setTotalLeads(0);
-    setLogs([`▶ Starting campaign...`, `Goal: ${goal}`, `Sender: ${senderName} — seeking: ${seeking}`]);
+    setLogs([`▶ Starting campaign...`, `Goal: ${goal}`, `Sender: ${activeSender} — seeking: ${activeSeeking}`]);
 
     try {
       const res = await fetch("/run-campaign?page=1&limit=10", {
@@ -468,8 +477,8 @@ export default function App() {
         body: JSON.stringify({
           goal,
           session_id: SESSION_ID,
-          sender_name: senderName,
-          seeking,
+          sender_name: activeSender,
+          seeking: activeSeeking,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
@@ -484,19 +493,24 @@ export default function App() {
         `✅ ${data.outreach_targets?.length ?? 0} emails drafted`,
       ]);
       // Save to history
-      setHistory(prev => [{
-        id: Date.now(),
-        goal,
-        filters: { ...activeFilters },
-        seeking,
-        prospectsFound: data.prospects_found,
-        emailsDrafted: data.outreach_targets?.length ?? 0,
-        timestamp: new Date().toLocaleTimeString(),
-        result: data,
-        page: data.current_page || 1,
-        totalPages: data.total_pages_count || 1,
-        totalLeads: data.total_leads_count || 0,
-      }, ...prev.slice(0, 9)]);
+      setHistory(prev => {
+        const next = [{
+          id: Date.now(),
+          goal,
+          filters: { ...activeFilters },
+          seeking: activeSeeking,
+          senderName: activeSender,
+          prospectsFound: data.prospects_found,
+          emailsDrafted: data.outreach_targets?.length ?? 0,
+          timestamp: new Date().toLocaleTimeString(),
+          result: data,
+          page: data.current_page || 1,
+          totalPages: data.total_pages_count || 1,
+          totalLeads: data.total_leads_count || 0,
+        }, ...prev];
+        try { localStorage.setItem("ag_campaign_history", JSON.stringify(next)); } catch (e) {}
+        return next;
+      });
     } catch (err) {
       setStatus(STATUS.ERROR);
       setError(err.message);
@@ -515,13 +529,20 @@ export default function App() {
   const loadFromHistory = (entry) => {
     setFilters(entry.filters);
     setSeeking(entry.seeking);
+    if (entry.senderName) setSenderName(entry.senderName);
     setResult(entry.result);
     setPage(entry.page || 1);
     setTotalPages(entry.totalPages || 1);
     setTotalLeads(entry.totalLeads || 0);
     setStatus(STATUS.DONE);
     setStep("results");
-    setShowHistory(false);
+  };
+
+  const rerunFromHistory = (entry) => {
+    setFilters(entry.filters);
+    setSeeking(entry.seeking);
+    if (entry.senderName) setSenderName(entry.senderName);
+    runCampaign(entry.filters, entry.seeking, entry.senderName);
   };
 
   // ── FORM ─────────────────────────────────────────────────────────────────────
@@ -609,41 +630,7 @@ export default function App() {
         }}>
           GENERATE LEADS →
         </button>
-        {history.length > 0 && (
-          <button onClick={() => setShowHistory(s => !s)} style={{
-            padding: "11px 16px", background: "transparent", border: "1px solid #1f2937",
-            color: "#475569", borderRadius: "4px", cursor: "pointer",
-            fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px",
-          }}>
-            history ({history.length})
-          </button>
-        )}
       </div>
-
-      {/* History Panel */}
-      {showHistory && history.length > 0 && (
-        <div style={{ marginTop: "16px", background: "#0a0e14", border: "1px solid #111827", borderRadius: "6px", overflow: "hidden" }}>
-          {history.map((entry, i) => (
-            <div key={entry.id} onClick={() => loadFromHistory(entry)} style={{
-              padding: "10px 14px", borderBottom: i < history.length - 1 ? "1px solid #111827" : "none",
-              cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
-            }}
-              onMouseEnter={e => e.currentTarget.style.background = "#0d1117"}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-            >
-              <div>
-                <div style={{ fontSize: "11px", color: "#94a3b8", fontFamily: "'IBM Plex Mono', monospace" }}>
-                  {entry.seeking} → {entry.filters.roles.slice(0, 2).join(", ")} {entry.filters.locations.slice(0, 1).join("")}
-                </div>
-                <div style={{ fontSize: "10px", color: "#374151", fontFamily: "'IBM Plex Mono', monospace", marginTop: "2px" }}>
-                  {entry.prospectsFound} prospects · {entry.emailsDrafted} emails · {entry.timestamp}
-                </div>
-              </div>
-              <span style={{ fontSize: "10px", color: "#4b5563" }}>load →</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 
@@ -748,9 +735,14 @@ export default function App() {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#060912", color: "#e2e8f0" }}>
-      {/* Header */}
-      <div style={{ borderBottom: "1px solid #111827", padding: "14px 28px", display: "flex", alignItems: "center", gap: "10px", background: "#070b10" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#060912", color: "#e2e8f0" }}>
+      <div style={{ position: "sticky", top: 0, height: "100vh", display: "flex" }}>
+        <Sidebar history={history} onView={loadFromHistory} onRerun={rerunFromHistory} />
+      </div>
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        {/* Header */}
+        <div style={{ borderBottom: "1px solid #111827", padding: "14px 28px", display: "flex", alignItems: "center", gap: "10px", background: "#070b10" }}>
         <div style={{
           width: "7px", height: "7px", borderRadius: "50%",
           background: status === STATUS.RUNNING ? "#f59e0b" : status === STATUS.DONE ? "#4ade80" : status === STATUS.ERROR ? "#f87171" : "#6366f1",
@@ -763,6 +755,7 @@ export default function App() {
       </div>
 
       {step === "form" ? <FormStep /> : <ResultsStep />}
+      </div>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap');
