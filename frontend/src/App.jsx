@@ -205,7 +205,7 @@ function EmailCard({ item, index, sessionId, prospectId }) {
           {hasEmail && <ConfidenceBadge confidence={prospect?.email_confidence} />}
           {!hasEmail && <span style={{ fontSize: "10px", color: "#4b5563" }}>❌ no email</span>}
           <span style={{ background: "#1e1b4b", color: "#818cf8", padding: "1px 6px", borderRadius: "999px", fontSize: "10px", fontWeight: 700 }}>{score}</span>
-          <WordCount count={activeVariantInfo.word_count ?? (email?.word_count ?? 0)} />
+          <WordCount count={editState.body.split(/\s+/).filter(w => w.length > 0).length} />
           <span style={{ color: "#4b5563", fontSize: "12px" }}>{open ? "▲" : "▼"}</span>
         </span>
       </button>
@@ -304,6 +304,61 @@ function EmailCard({ item, index, sessionId, prospectId }) {
   );
 }
 
+function Skeletons() {
+  return (
+    <>
+      {Array.from({ length: 10 }).map((_, i) => (
+        <div key={i} style={{
+          border: "1px solid #1f2937", borderLeft: "3px solid #374151",
+          marginBottom: "8px", background: "#0a0e14", borderRadius: "4px",
+          height: "44px", display: "flex", alignItems: "center", padding: "0 14px",
+          animation: "pulse 1.5s infinite"
+        }}>
+          <div style={{ width: "20px", height: "12px", background: "#1f2937", borderRadius: "2px", marginRight: "12px" }} />
+          <div style={{ width: "120px", height: "12px", background: "#1f2937", borderRadius: "2px" }} />
+          <div style={{ width: "80px", height: "10px", background: "#111827", borderRadius: "2px", marginLeft: "12px" }} />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function PaginationBar({ page, totalPages, totalLeads, onPageChange }) {
+  if (totalLeads === 0) {
+    return <div style={{ color: "#64748b", fontFamily: "'IBM Plex Mono', monospace", fontSize: "12px", padding: "20px 0", textAlign: "center", border: "1px dashed #1f2937", borderRadius: "4px", marginBottom: "16px" }}>No leads found for this search.</div>;
+  }
+
+  let start = Math.max(1, page - 2);
+  let end = Math.min(totalPages, page + 2);
+  if (end - start < 4) {
+    if (start === 1) end = Math.min(totalPages, 5);
+    else if (end === totalPages) start = Math.max(1, totalPages - 4);
+  }
+
+  const pills = [];
+  for (let i = start; i <= end; i++) pills.push(i);
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", background: "#0a0e14", padding: "10px 14px", borderRadius: "4px", border: "1px solid #111827", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <span style={{ color: "#a5b4fc", fontWeight: 700 }}>Batch {page} of {totalPages}</span>
+        <span style={{ color: "#64748b" }}>•</span>
+        <span style={{ color: "#94a3b8" }}>{totalLeads} total leads</span>
+      </div>
+      
+      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        <button disabled={page === 1} onClick={() => onPageChange(page - 1)} style={{ background: "transparent", border: "1px solid #1f2937", color: page === 1 ? "#374151" : "#e2e8f0", padding: "4px 8px", borderRadius: "3px", cursor: page === 1 ? "not-allowed" : "pointer", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px" }}>Prev</button>
+        
+        {pills.map(p => (
+           <button key={p} onClick={() => onPageChange(p)} style={{ background: p === page ? "#6366f1" : "transparent", color: p === page ? "#fff" : "#94a3b8", border: p === page ? "none" : "1px solid #1f2937", padding: "4px 8px", borderRadius: "3px", cursor: "pointer", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", minWidth: "28px" }}>{p}</button>
+        ))}
+
+        <button disabled={page === totalPages} onClick={() => onPageChange(page + 1)} style={{ background: "transparent", border: "1px solid #1f2937", color: page === totalPages ? "#374151" : "#e2e8f0", padding: "4px 8px", borderRadius: "3px", cursor: page === totalPages ? "not-allowed" : "pointer", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px" }}>Next</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -319,6 +374,11 @@ export default function App() {
   const [history, setHistory]       = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const logsEndRef = useRef(null);
+  
+  const [page, setPage]             = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [isPaginating, setIsPaginating] = useState(false);
 
   // ── Agent Thinking Window state ───────────────────────────────────────────
   const [agentStep, setAgentStep] = useState(AGENT_STEP_IDS[0]);
@@ -360,17 +420,13 @@ export default function App() {
 
   const updateFilter = key => val => setFilters(f => ({ ...f, [key]: val }));
 
-  const runCampaign = async (overrideFilters) => {
-    const activeFilters = overrideFilters || filters;
-    const goal = filtersToGoal(activeFilters, seeking, senderName);
-    setStatus(STATUS.RUNNING);
-    setStep("results");
-    setResult(null);
-    setError(null);
-    setLogs([`▶ Starting campaign...`, `Goal: ${goal}`, `Sender: ${senderName} — seeking: ${seeking}`]);
-
+  const fetchPage = async (newPage) => {
+    setIsPaginating(true);
+    setPage(newPage);
     try {
-      const res = await fetch("/run-campaign", {
+      const activeFilters = filters;
+      const goal = filtersToGoal(activeFilters, seeking, senderName);
+      const res = await fetch(`/run-campaign?page=${newPage}&limit=10`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -383,6 +439,45 @@ export default function App() {
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const data = await res.json();
       setResult(data);
+      setPage(data.current_page || 1);
+      setTotalPages(data.total_pages_count || 1);
+      setTotalLeads(data.total_leads_count || 0);
+    } catch (err) {
+      setError(err.message);
+    }
+    setIsPaginating(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const runCampaign = async (overrideFilters) => {
+    const activeFilters = overrideFilters || filters;
+    const goal = filtersToGoal(activeFilters, seeking, senderName);
+    setStatus(STATUS.RUNNING);
+    setStep("results");
+    setResult(null);
+    setError(null);
+    setPage(1);
+    setTotalPages(1);
+    setTotalLeads(0);
+    setLogs([`▶ Starting campaign...`, `Goal: ${goal}`, `Sender: ${senderName} — seeking: ${seeking}`]);
+
+    try {
+      const res = await fetch("/run-campaign?page=1&limit=10", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          goal,
+          session_id: SESSION_ID,
+          sender_name: senderName,
+          seeking,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      const data = await res.json();
+      setResult(data);
+      setPage(data.current_page || 1);
+      setTotalPages(data.total_pages_count || 1);
+      setTotalLeads(data.total_leads_count || 0);
       setStatus(STATUS.DONE);
       setLogs(prev => [...prev,
         `✅ ${data.prospects_found} prospects found`,
@@ -398,6 +493,9 @@ export default function App() {
         emailsDrafted: data.outreach_targets?.length ?? 0,
         timestamp: new Date().toLocaleTimeString(),
         result: data,
+        page: data.current_page || 1,
+        totalPages: data.total_pages_count || 1,
+        totalLeads: data.total_leads_count || 0,
       }, ...prev.slice(0, 9)]);
     } catch (err) {
       setStatus(STATUS.ERROR);
@@ -418,6 +516,9 @@ export default function App() {
     setFilters(entry.filters);
     setSeeking(entry.seeking);
     setResult(entry.result);
+    setPage(entry.page || 1);
+    setTotalPages(entry.totalPages || 1);
+    setTotalLeads(entry.totalLeads || 0);
     setStatus(STATUS.DONE);
     setStep("results");
     setShowHistory(false);
@@ -620,9 +721,21 @@ export default function App() {
             ))}
           </div>
 
-          {activeTab === "emails" && result.outreach_targets?.map((item, i) => (
-            <EmailCard key={i} item={item} index={i} sessionId={SESSION_ID} prospectId={i} />
-          ))}
+          {activeTab === "emails" && (
+            <>
+              <PaginationBar page={page} totalPages={totalPages} totalLeads={totalLeads} onPageChange={fetchPage} />
+              
+              {isPaginating ? <Skeletons /> : result.outreach_targets?.map((item, i) => (
+                <EmailCard key={i} item={item} index={(page - 1) * 10 + i} sessionId={SESSION_ID} prospectId={(page - 1) * 10 + i} />
+              ))}
+
+              {!isPaginating && result.outreach_targets?.length > 0 && totalPages > 1 && (
+                <div style={{ marginTop: "16px" }}>
+                  <PaginationBar page={page} totalPages={totalPages} totalLeads={totalLeads} onPageChange={fetchPage} />
+                </div>
+              )}
+            </>
+          )}
 
           {activeTab === "raw" && (
             <pre style={{ background: "#0a0e14", border: "1px solid #111827", borderRadius: "4px", padding: "16px", color: "#64748b", fontSize: "11px", lineHeight: "1.7", overflowX: "auto", maxHeight: "600px", overflowY: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>

@@ -131,7 +131,7 @@ async def plan_campaign(goal: str, session_id: str, sender_name: str = "", seeki
         all_scored_results = deduped
 
         print("\n🏆 TOP PROSPECTS\n")
-        for r in all_scored_results[:10]:
+        for r in all_scored_results:
             p = r["prospect"]
             email_tag = f"📧 {p.get('email')}" if p.get("email") else "❌ no email"
             print(f"{r['score']} — {p.get('name')} ({p.get('role')}) | {email_tag}")
@@ -166,7 +166,7 @@ async def plan_campaign(goal: str, session_id: str, sender_name: str = "", seeki
 
     emails = await asyncio.gather(*[
         draft_email(r["prospect"], goal, tone, sender_name, seeking)
-        for r in scored_results[:10]
+        for r in scored_results
     ])
 
     print(f"✅ {len(emails)} emails drafted")
