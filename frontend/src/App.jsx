@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect } from "react";
+import AgentWindow from "./AgentWindow";
 
 const SESSION_ID = crypto.randomUUID();
 const STATUS = { IDLE: "idle", RUNNING: "running", DONE: "done", ERROR: "error" };
+
+// Defined at module scope so useEffect dependency array is stable
+const AGENT_STEP_IDS = ["searching", "enriching", "drafting-v1", "generating", "ready"];
 
 const ROLES = ["Founder", "CEO", "CTO", "CMO", "HR Manager", "Talent Acquisition", "CHRO", "Director", "Head of Growth", "Marketing Manager", "Product Manager", "Sales Head"];
 const INDUSTRIES = ["SaaS", "AI / ML", "Fintech", "Edtech", "Ecommerce", "Healthcare", "Media", "Consulting", "IT Services", "Startup"];
@@ -108,6 +112,23 @@ function CopyButton({ text }) {
   );
 }
 
+function SaveButton() {
+  const [saved, setSaved] = useState(false);
+  const save = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+  return (
+    <button onClick={save} style={{
+      background: "transparent", border: "1px solid #1f2937", borderRadius: "3px",
+      color: saved ? "#4ade80" : "#475569", fontFamily: "'IBM Plex Mono', monospace",
+      fontSize: "10px", padding: "2px 8px", cursor: "pointer",
+    }}>
+      {saved ? "✓ saved" : "save edit"}
+    </button>
+  );
+}
+
 function EmailCard({ item, index, sessionId, prospectId }) {
   const [open, setOpen] = useState(index === 0);
   const [sending, setSending] = useState(false);
@@ -115,13 +136,45 @@ function EmailCard({ item, index, sessionId, prospectId }) {
   const { prospect, score, email } = item;
   const hasEmail = !!prospect?.email;
 
+  // Assume single variant if 'variants' is missing
+  const variants = email?.variants || (email?.subject ? [
+    { type: "Direct", subject: email.subject, body: email.body, personalisation_used: email.personalisation_used, word_count: email.word_count }
+  ] : []);
+
+  // Set default tab to the first variant type found
+  const [activeTab, setActiveTab] = useState(variants[0]?.type || "Direct");
+
+  const [edits, setEdits] = useState(() => {
+    const init = {};
+    variants.forEach(v => {
+      init[v.type] = { subject: v.subject || "", body: v.body || "" };
+    });
+    return init;
+  });
+
+  const currentType = activeTab;
+  const activeVariantInfo = variants.find(v => v.type === activeTab) || variants[0] || {};
+  const editState = edits[currentType] || { subject: activeVariantInfo.subject || "", body: activeVariantInfo.body || "" };
+
+  const handleEdit = (field, value) => {
+    setEdits(prev => ({
+      ...prev,
+      [currentType]: { ...prev[currentType], [field]: value }
+    }));
+  };
+
   const sendEmail = async () => {
     setSending(true);
     try {
       const res = await fetch("/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prospect_id: prospectId, session_id: sessionId }),
+        body: JSON.stringify({ 
+          prospect_id: prospectId, 
+          session_id: sessionId,
+          subject: editState.subject,
+          body: editState.body
+        }),
       });
       const data = await res.json();
       setSent(data.sent ? "sent" : "failed");
@@ -152,7 +205,7 @@ function EmailCard({ item, index, sessionId, prospectId }) {
           {hasEmail && <ConfidenceBadge confidence={prospect?.email_confidence} />}
           {!hasEmail && <span style={{ fontSize: "10px", color: "#4b5563" }}>❌ no email</span>}
           <span style={{ background: "#1e1b4b", color: "#818cf8", padding: "1px 6px", borderRadius: "999px", fontSize: "10px", fontWeight: 700 }}>{score}</span>
-          <WordCount count={email?.word_count ?? 0} />
+          <WordCount count={activeVariantInfo.word_count ?? (email?.word_count ?? 0)} />
           <span style={{ color: "#4b5563", fontSize: "12px" }}>{open ? "▲" : "▼"}</span>
         </span>
       </button>
@@ -160,26 +213,71 @@ function EmailCard({ item, index, sessionId, prospectId }) {
       {open && (
         <div style={{ padding: "0 14px 14px 14px", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", lineHeight: "1.8", color: "#94a3b8", borderTop: "1px solid #1f2937", paddingTop: "12px" }}>
           {hasEmail && (
-            <div style={{ marginBottom: "6px" }}>
+            <div style={{ marginBottom: "8px" }}>
               <span style={{ color: "#475569" }}>EMAIL → </span>
               <span style={{ color: "#4ade80" }}>{prospect.email}</span>
               <span style={{ marginLeft: "8px" }}><ConfidenceBadge confidence={prospect.email_confidence} /></span>
             </div>
           )}
+          
+          {/* Variant Tabs */}
+          {variants.length > 0 && (
+            <div style={{ display: "flex", gap: "10px", marginBottom: "12px", borderBottom: "1px solid #1f2937", paddingBottom: "8px" }}>
+              {variants.map(v => (
+                <button
+                  key={v.type}
+                  onClick={() => setActiveTab(v.type)}
+                  style={{
+                    background: "transparent", border: "none",
+                    color: activeTab === v.type ? "#a5b4fc" : "#475569",
+                    fontWeight: activeTab === v.type ? 700 : 400,
+                    textTransform: "uppercase", fontSize: "10px", fontFamily: "'IBM Plex Mono', monospace",
+                    cursor: "pointer", padding: "0 4px"
+                  }}
+                >
+                  {v.type}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div style={{ marginBottom: "6px" }}>
-            <span style={{ color: "#475569" }}>SUBJECT → </span>
-            <span style={{ color: "#e2e8f0" }}>{email?.subject}</span>
+            <span style={{ color: "#475569", display: "block", marginBottom: "4px" }}>SUBJECT → </span>
+            <input 
+              value={editState.subject}
+              onChange={e => handleEdit("subject", e.target.value)}
+              style={{
+                width: "100%", background: "#060912", border: "1px solid #1f2937", borderRadius: "4px",
+                color: "#e2e8f0", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", padding: "6px 10px", outline: "none", boxSizing: "border-box"
+              }}
+              onFocus={e => e.target.style.borderColor = "#6366f1"}
+              onBlur={e => e.target.style.borderColor = "#1f2937"}
+            />
           </div>
+
           <div style={{ marginBottom: "10px" }}>
             <span style={{ color: "#475569" }}>HOOK → </span>
-            <span style={{ color: "#a5b4fc" }}>{email?.personalisation_used}</span>
+            <span style={{ color: "#a5b4fc" }}>{activeVariantInfo.personalisation_used || email?.personalisation_used}</span>
           </div>
-          <div style={{ padding: "10px", background: "#111827", borderRadius: "4px", color: "#cbd5e1", lineHeight: "1.9", whiteSpace: "pre-wrap", marginBottom: "10px" }}>
-            {email?.body}
+
+          <div style={{ marginBottom: "10px" }}>
+            <span style={{ color: "#475569", display: "block", marginBottom: "4px" }}>BODY → </span>
+            <textarea
+              value={editState.body}
+              onChange={e => handleEdit("body", e.target.value)}
+              style={{
+                width: "100%", minHeight: "140px", background: "#111827", border: "1px solid #1f2937", borderRadius: "4px",
+                color: "#cbd5e1", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", lineHeight: "1.9", padding: "10px", outline: "none", resize: "vertical", boxSizing: "border-box"
+              }}
+              onFocus={e => e.target.style.borderColor = "#6366f1"}
+              onBlur={e => e.target.style.borderColor = "#1f2937"}
+            />
           </div>
+          
           {/* Action row */}
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <CopyButton text={`Subject: ${email?.subject}\n\n${email?.body}`} />
+            <CopyButton text={`Subject: ${editState.subject}\n\n${editState.body}`} />
+            <SaveButton />
             {hasEmail && (
               <button
                 onClick={sendEmail}
@@ -193,7 +291,7 @@ function EmailCard({ item, index, sessionId, prospectId }) {
                   cursor: sending || sent === "sent" ? "not-allowed" : "pointer",
                 }}
               >
-                {sending ? "sending..." : sent === "sent" ? "✓ sent" : sent === "failed" ? "✗ failed" : "send →"}
+                {sending ? "sending..." : sent === "sent" ? "✓ sent" : sent === "failed" ? "✗ failed" : "send this"}
               </button>
             )}
             {!hasEmail && (
@@ -221,6 +319,37 @@ export default function App() {
   const [history, setHistory]       = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const logsEndRef = useRef(null);
+
+  // ── Agent Thinking Window state ───────────────────────────────────────────
+  const [agentStep, setAgentStep] = useState(AGENT_STEP_IDS[0]);
+  const [agentLead, setAgentLead] = useState("");
+
+  // Auto-advance steps every 1.2 s while the pipeline is running
+  useEffect(() => {
+    if (status !== STATUS.RUNNING) return;
+    // Reset to first step on every new run
+    setAgentStep(AGENT_STEP_IDS[0]);
+    setAgentLead("");
+    let idx = 0;
+    const timer = setInterval(() => {
+      idx += 1;
+      if (idx < AGENT_STEP_IDS.length - 1) {
+        setAgentStep(AGENT_STEP_IDS[idx]);
+      } else {
+        // Stay on the last "active" step until the run actually finishes
+        clearInterval(timer);
+      }
+    }, 1200);
+    return () => clearInterval(timer);
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Snap to "ready" as soon as the run completes
+  useEffect(() => {
+    if (status === STATUS.DONE || status === STATUS.ERROR) {
+      setAgentStep("ready");
+    }
+  }, [status]);
+  // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
 
@@ -280,6 +409,9 @@ export default function App() {
   const refineAndRerun = () => {
     setStep("form");
     setStatus(STATUS.IDLE);
+    // Reset agent panel so it starts fresh on the next run
+    setAgentStep(AGENT_STEP_IDS[0]);
+    setAgentLead("");
   };
 
   const loadFromHistory = (entry) => {
@@ -451,6 +583,12 @@ export default function App() {
           <div ref={logsEndRef} />
         </div>
       )}
+
+      {/* ── Agent Thinking Window — shown whenever we are in results view ── */}
+      {(isRunning || status === STATUS.DONE || status === STATUS.ERROR) && (
+        <AgentWindow currentStep={agentStep} activeLead={agentLead} />
+      )}
+      {/* ─────────────────────────────────────────────────────────────────── */}
 
       {error && (
         <div style={{ background: "#1c0a0a", border: "1px solid #7f1d1d", borderRadius: "4px", padding: "10px 14px", color: "#f87171", fontSize: "11px", marginBottom: "16px", fontFamily: "'IBM Plex Mono', monospace" }}>

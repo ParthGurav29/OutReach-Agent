@@ -43,7 +43,7 @@ async def call_model(prompt):
         return None
 
 
-async def generate_variant(prospect, goal, tone, personal_context, sender_name, seeking):
+async def generate_variants(prospect, goal, tone, personal_context, sender_name, seeking):
 
     # Build sender identity block
     sender_identity = f"My name is {sender_name}" if sender_name else "I'm reaching out"
@@ -51,7 +51,7 @@ async def generate_variant(prospect, goal, tone, personal_context, sender_name, 
         sender_identity += f" and I'm seeking {seeking}"
 
     prompt = f"""
-You are writing a cold outreach email ON BEHALF OF {sender_name or "the sender"}.
+You are writing cold outreach emails ON BEHALF OF {sender_name or "the sender"}.
 
 SENDER IDENTITY:
 {sender_identity}
@@ -74,33 +74,57 @@ STRICT RULES:
 1. First sentence MUST reference the personalisation context — name a specific project, newsletter, company, or achievement.
 2. Subject MUST reference the personalisation context.
 3. NEVER use: "I hope this finds you well", "I noticed your background in", "Just reaching out", "I came across your profile".
-4. The email must clearly state WHO the sender is and WHAT they are seeking — use the sender identity naturally.
+4. The email must clearly state WHO the sender is and WHAT they are seeking.
 5. Body must be 80–120 words.
 6. End with ONE soft CTA.
 7. Sign off as "{sender_name}" only — no title, no placeholders.
 8. ZERO placeholders like [Your Name], [Company], [Position].
 
-Return ONLY valid JSON:
+You MUST generate exactly 3 variations of the email:
+1. "Direct" type: Get straight to the point and the ask.
+2. "Value" type: Focus more on the value proposition and why it matters to them.
+3. "Question" type: End with a thought-provoking question related to their context.
 
-{{
-  "subject": "subject referencing personalisation context",
-  "body": "complete email signed as {sender_name}",
-  "personalisation_used": "exact detail from context referenced in first sentence",
-  "word_count": <integer>
-}}
+Return ONLY valid JSON containing an array of exactly 3 objects (one for each type).
+Use exactly these keys: "type", "subject", "body", "personalisation_used".
+
+[
+  {{
+    "type": "Direct",
+    "subject": "...",
+    "body": "...",
+    "personalisation_used": "..."
+  }},
+  {{
+    "type": "Value",
+    "subject": "...",
+    "body": "...",
+    "personalisation_used": "..."
+  }},
+  {{
+    "type": "Question",
+    "subject": "...",
+    "body": "...",
+    "personalisation_used": "..."
+  }}
+]
 """
 
     result = await call_model(prompt)
-    if not result:
+    if not isinstance(result, list):
         return None
 
-    result["word_count"] = len(result.get("body", "").split())
+    valid_variants = []
+    for r in result:
+        body = r.get("body", "")
+        if "[" not in body and "]" not in body:
+            r["word_count"] = len(body.split())
+            valid_variants.append(r)
 
-    body = result.get("body", "")
-    if "[" in body or "]" in body:
+    if not valid_variants:
         return None
 
-    return result
+    return valid_variants
 
 
 async def expand_email(email_body, sender_name, seeking):
@@ -143,47 +167,11 @@ async def draft_email(prospect: dict, goal: str, tone: str, sender_name: str = "
     if not sender_name:
         sender_name = os.getenv("SENDER_NAME", "the team")
 
-    variants = []
+    variants = await generate_variants(
+        prospect, goal, tone, personal_context, sender_name, seeking
+    )
 
-    for _ in range(3):
-        email = await generate_variant(
-            prospect, goal, tone, personal_context, sender_name, seeking
-        )
-
-        if not email:
-            continue
-
-        wc = email.get("word_count", 0)
-
-        if wc < 80:
-            print(f"⚠️ Email too short ({wc}w) → expanding")
-            expanded = await expand_email(email["body"], sender_name, seeking)
-            if expanded:
-                email = expanded
-                email["word_count"] = len(email.get("body", "").split())
-
-        review = review_email(
-            email=email["body"],
-            prospect_profile=prospect,
-            goal=goal,
-            tone=tone
-        )
-
-        email["quality_review"] = review
-
-        print(f"\n🧪 QUALITY — {prospect.get('name')} | score: {review.get('score', '?')}")
-
-        if not review.get("passed"):
-            rewritten = review.get("rewritten_email")
-            if rewritten:
-                email["body"] = rewritten
-                email["word_count"] = len(rewritten.split())
-
-        variants.append(email)
-
-    best = max(variants, key=lambda v: v.get("quality_review", {}).get("score", 0)) if variants else None
-
-    if not best:
+    if not variants:
         seek_line = f"seeking {seeking}" if seeking else ""
         fallback_body = (
             f"Hi {prospect.get('name', 'there')},\n\n"
@@ -192,12 +180,66 @@ async def draft_email(prospect: dict, goal: str, tone: str, sender_name: str = "
             f"Would you be open to a quick chat?\n\n"
             f"{sender_name}"
         )
+        variants = [
+            {
+                "type": "Direct",
+                "subject": f"Quick thought on {prospect.get('company', 'your work')}",
+                "body": fallback_body,
+                "personalisation_used": personal_context,
+                "word_count": len(fallback_body.split()),
+                "quality_review": {"passed": False, "issues": ["fallback used"], "score": 0}
+            },
+            {
+                "type": "Value",
+                "subject": f"Value for {prospect.get('company', 'your work')}",
+                "body": fallback_body,
+                "personalisation_used": personal_context,
+                "word_count": len(fallback_body.split()),
+                "quality_review": {"passed": False, "issues": ["fallback used"], "score": 0}
+            },
+            {
+                "type": "Question",
+                "subject": f"Question about {prospect.get('company', 'your work')}",
+                "body": fallback_body,
+                "personalisation_used": personal_context,
+                "word_count": len(fallback_body.split()),
+                "quality_review": {"passed": False, "issues": ["fallback used"], "score": 0}
+            }
+        ]
         return {
-            "subject": f"Quick thought on {prospect.get('company', 'your work')}",
-            "body": fallback_body,
-            "personalisation_used": personal_context,
-            "word_count": len(fallback_body.split()),
-            "quality_review": {"passed": False, "issues": ["fallback used"], "score": 0}
+            "subject": variants[0].get("subject", ""),
+            "body": variants[0].get("body", ""),
+            "variants": variants
         }
 
-    return best
+    for idx, email in enumerate(variants):
+        wc = email.get("word_count", 0)
+
+        if wc < 80:
+            print(f"⚠️ Email too short ({wc}w) → expanding")
+            expanded = await expand_email(email["body"], sender_name, seeking)
+            if expanded:
+                email["body"] = expanded.get("body", email["body"])
+                email["word_count"] = len(email["body"].split())
+
+        review = review_email(
+            email=email["body"],
+            prospect_profile=prospect,
+            goal=goal,
+            tone=tone
+        )
+        email["quality_review"] = review
+        print(f"\n🧪 QUALITY — {prospect.get('name')} ({email.get('type')}) | score: {review.get('score', '?')}")
+
+        if not review.get("passed"):
+            rewritten = review.get("rewritten_email")
+            if rewritten:
+                email["body"] = rewritten
+                email["word_count"] = len(rewritten.split())
+
+    default = variants[0]
+    return {
+        "subject": default.get("subject", ""),
+        "body": default.get("body", ""),
+        "variants": variants
+    }
