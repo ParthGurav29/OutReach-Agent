@@ -24,6 +24,10 @@ export default function App() {
   const [sessionId, setSessionId] = useState('');
   const [selectedProspect, setSelectedProspect] = useState(null);
 
+  // Sender Details
+  const [senderDetails, setSenderDetails] = useState({ name: '', role: '', company: '', oneliner: '' });
+  const [senderNameWarning, setSenderNameWarning] = useState(false);
+
   useEffect(() => {
     // Generate a unique session ID on load
     setSessionId(Math.random().toString(36).substring(2, 10));
@@ -31,6 +35,12 @@ export default function App() {
 
   const handleRunCampaign = async () => {
     if (!goal.trim()) return;
+    // Soft warning if sender name is empty
+    if (!senderDetails.name.trim()) {
+      setSenderNameWarning(true);
+    } else {
+      setSenderNameWarning(false);
+    }
     
     setIsProcessing(true);
     setHasFinished(false);
@@ -90,7 +100,8 @@ export default function App() {
         body: JSON.stringify({ 
           goal: enrichedGoal, 
           session_id: sessionId,
-          lead_count: leadCount
+          lead_count: leadCount,
+          sender_details: senderDetails
         })
       });
       if (!res.ok) throw new Error("Trigger failed");
@@ -124,6 +135,64 @@ export default function App() {
           
           {/* Filters Panel */}
           <div className="bg-[#0D1117] p-3 rounded-lg border border-[#30363D] flex flex-col gap-3">
+
+            {/* ── Sender Profile ── */}
+            <div className="flex justify-between items-center px-1">
+              <h3 className="text-[10px] font-bold text-[#7D8590] uppercase tracking-[0.2em]">Sender Profile</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-0">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-[#7D8590] uppercase px-1">Your Name <span className="text-[#F85149]">*</span></label>
+                <input
+                  value={senderDetails.name}
+                  onChange={e => { setSenderDetails(p => ({ ...p, name: e.target.value })); setSenderNameWarning(false); }}
+                  disabled={isProcessing}
+                  placeholder="Parth Gurav"
+                  className={`bg-[#161B22] border rounded-md p-1.5 text-xs text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:outline-none transition-all ${
+                    senderNameWarning ? 'border-[#F85149] focus:ring-[#F85149] focus:border-[#F85149]' : 'border-[#444c56] focus:ring-[#FF9900] focus:border-[#FF9900]'
+                  }`}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-[#7D8590] uppercase px-1">Your Role</label>
+                <input
+                  value={senderDetails.role}
+                  onChange={e => setSenderDetails(p => ({ ...p, role: e.target.value }))}
+                  disabled={isProcessing}
+                  placeholder="Founder, Engineer…"
+                  className="bg-[#161B22] border border-[#444c56] rounded-md p-1.5 text-xs text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:ring-[#FF9900] focus:border-[#FF9900] focus:outline-none transition-all"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-[#7D8590] uppercase px-1">Your Company</label>
+                <input
+                  value={senderDetails.company}
+                  onChange={e => setSenderDetails(p => ({ ...p, company: e.target.value }))}
+                  disabled={isProcessing}
+                  placeholder="Stealth Startup…"
+                  className="bg-[#161B22] border border-[#444c56] rounded-md p-1.5 text-xs text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:ring-[#FF9900] focus:border-[#FF9900] focus:outline-none transition-all"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-[#7D8590] uppercase px-1">One-liner</label>
+                <input
+                  value={senderDetails.oneliner}
+                  onChange={e => setSenderDetails(p => ({ ...p, oneliner: e.target.value.slice(0, 100) }))}
+                  disabled={isProcessing}
+                  placeholder="Building AI tools for devs"
+                  maxLength={100}
+                  className="bg-[#161B22] border border-[#444c56] rounded-md p-1.5 text-xs text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:ring-[#FF9900] focus:border-[#FF9900] focus:outline-none transition-all"
+                />
+              </div>
+            </div>
+            {senderNameWarning && (
+              <p className="text-[10px] text-[#F85149] font-bold px-1 -mt-1">⚠ Add your name to personalise messages</p>
+            )}
+            <p className="text-[9px] text-[#7D8590] px-1 -mt-1 italic">Used to personalise outreach drafts</p>
+
+            <div className="border-t border-[#30363D]/50"></div>
+
+            {/* ── Targeting Filters ── */}
             <div className="flex justify-between items-center px-1">
               <h3 className="text-[10px] font-bold text-[#7D8590] uppercase tracking-[0.2em]">Targeting Filters</h3>
               <div className="flex items-center gap-2">

@@ -84,3 +84,12 @@ body {
 .animate-fade-in {
   animation: fade-in 0.6s ease-out forwards;
 }
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.modal-animate {
+  animation: modal-in 0.2s ease-out forwards;
+}

@@ -91,14 +91,48 @@ Return JSON with list "icebreakers":
 """
     return await invoke_nova_micro(sys, user)
 
-async def message_drafter(goal: str, plan: dict, profile: dict, recency: dict, tone: dict, icebreakers: dict) -> dict:
+async def message_drafter(goal: str, plan: dict, profile: dict, recency: dict, tone: dict, icebreakers: dict, sender_details: dict = None) -> dict:
     sys = "You are a master copywriter. Read the inputs and generate a DM and Email draft. Output ONLY strict JSON."
+
+    # Build sender context block — falls back to empty if not provided
+    sd = sender_details or {}
+    sender_name    = sd.get("name", "").strip()
+    sender_role    = sd.get("role", "").strip()
+    sender_company = sd.get("company", "").strip()
+    sender_oneliner = sd.get("oneliner", "").strip()
+
+    if sender_name:
+        sender_block = f"""
+The person sending this message:
+Name: {sender_name}
+{f'Role: {sender_role}' if sender_role else ''}
+{f'Company: {sender_company}' if sender_company else ''}
+{f'About them: {sender_oneliner}' if sender_oneliner else ''}
+
+Use this to sign off the message naturally and to frame the outreach from a real person's perspective.
+Instead of a generic opener, start with context about who is reaching out and why it is relevant.
+
+DM format (60-80 words):
+- Open with one specific thing about the prospect
+- One sentence about who you (the sender) are and why relevant
+- Clear ask or conversation starter
+- Sign off with: {sender_name}
+
+Email format (120 words max):
+- Subject line that references something specific about the prospect
+- Same structure as DM but with slightly more context on the sender
+- Professional close with name{f' + {sender_role}' if sender_role else ''}{f' + {sender_company}' if sender_company else ''}
+"""
+    else:
+        sender_block = "Sign off messages naturally without a specific sender name."
+
     user = f"""Goal: {goal}
 Plan: {plan}
 Profile: {profile}
 Recency: {recency}
 Tone: {tone}
 Icebreakers: {icebreakers}
+{sender_block}
 
 Using the best icebreaker and writing in a tone matching theirs (if appropriate), draft outreach messages.
 

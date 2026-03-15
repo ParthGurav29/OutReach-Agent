@@ -13,7 +13,7 @@ def _profile_slug(url: str) -> str | None:
     if match: return match.group(1).lower()
     return url  # fallback
 
-async def _process_prospect(prospect_data, plan, log_cb, send_card_cb):
+async def _process_prospect(prospect_data, plan, log_cb, send_card_cb, sender_details=None):
     name = prospect_data.get("name", "Unknown")
     company = prospect_data.get("company", "Unknown")
     url = prospect_data.get("url", "")
@@ -92,7 +92,8 @@ async def _process_prospect(prospect_data, plan, log_cb, send_card_cb):
             profile=profile,
             recency=recency,
             tone=tone,
-            icebreakers=icebreakers
+            icebreakers=icebreakers,
+            sender_details=sender_details or {}
         )
     except Exception as e:
         await log_cb(f"[!] Draft failed for {name}: {e}")
@@ -122,7 +123,7 @@ async def _process_prospect(prospect_data, plan, log_cb, send_card_cb):
     
     return card
 
-async def run_pipeline(goal: str, session: dict, log_cb, send_card_cb, lead_count: int = 10):
+async def run_pipeline(goal: str, session: dict, log_cb, send_card_cb, lead_count: int = 10, sender_details: dict = None):
     previous_queries = session.get("used_queries", [])
     
     retry_count = 0
@@ -179,8 +180,8 @@ async def run_pipeline(goal: str, session: dict, log_cb, send_card_cb, lead_coun
                 
         # Now process all concurrently, but cap concurrency to avoid rate limits
         tasks = []
-        for p in prospects[:lead_count]: # Process max lead_count to keep it demoable
-            tasks.append(_process_prospect(p, plan, log_cb, send_card_cb))
+        for p in prospects[:lead_count]:
+            tasks.append(_process_prospect(p, plan, log_cb, send_card_cb, sender_details))
             
         await log_cb(f"[~] Generating profiles and dispatching micro-agents...")
         finished = await asyncio.gather(*tasks)
