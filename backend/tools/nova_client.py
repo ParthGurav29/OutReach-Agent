@@ -68,7 +68,12 @@ async def invoke_nova_pro(sys: str, user: str, temp=0.7) -> dict:
 async def invoke_nova_micro(sys: str, user: str, temp=0.7) -> dict:
     res = await invoke_nova(NOVA_MICRO_ID, sys, user, temp)
     try:
-        return json.loads(res)
+        parsed = json.loads(res)
+        # Safety net: if the model wraps the result in a list, unwrap it
+        if isinstance(parsed, list):
+            print(f"⚠️  invoke_nova_micro: model returned a list, unwrapping first element. Raw: {res[:200]}")
+            parsed = parsed[0] if parsed else {}
+        return parsed
     except Exception as e:
         print(f"Failed to parse JSON from MICRO: {res}")
         raise ValueError("Failed to parse Nova Micro JSON response")

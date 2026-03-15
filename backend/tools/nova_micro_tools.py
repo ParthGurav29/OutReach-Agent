@@ -2,10 +2,20 @@ import asyncio
 from backend.tools.nova_client import invoke_nova_micro
 
 async def snippet_extractor(snippet: str) -> dict:
-    sys = "You are a snippet analyzer. Output ONLY strict JSON."
-    user = f"""Extract name and company from this search snippet: {snippet}
-Return JSON: {{"name": "...", "company": "..."}}
-If not found, use "unknown".
+    sys = "You are a snippet analyzer. Output ONLY a single strict JSON object — NOT an array, NOT a list."
+    user = f"""Extract the person's name and company from this search snippet.
+
+Snippet: {snippet}
+
+Return ONLY this exact JSON format — a single object with two keys, no wrapping array:
+{{"name": "Full Name Here", "company": "Company Name Here"}}
+
+Rules:
+- Output a plain JSON object (curly braces), NOT a JSON array (square brackets)
+- Do NOT wrap the result in [ ] — that would be wrong
+- If name not found, use "unknown"
+- If company not found, use "unknown"
+- No markdown, no code blocks, no extra text — just the JSON object
 """
     return await invoke_nova_micro(sys, user)
 

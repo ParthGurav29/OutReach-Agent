@@ -173,6 +173,10 @@ async def run_pipeline(goal: str, session: dict, log_cb, send_card_cb, lead_coun
         prospects = []
         for i, res in enumerate(extractions):
             if not isinstance(res, Exception):
+                # Safety unwrap: if the model returned a list of dicts, take the first item
+                if isinstance(res, list):
+                    res = res[0] if res else {}
+                    
                 p = deduped[i]
                 p["name"] = res.get("name")
                 p["company"] = res.get("company")
