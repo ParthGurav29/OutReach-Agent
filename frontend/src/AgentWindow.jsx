@@ -1,171 +1,109 @@
-/**
- * AgentWindow — Live step-by-step agent status panel.
- *
- * Props:
- *   currentStep  {string}  – ID of the active step (see STEPS below)
- *   activeLead   {string}  – Prospect name to inject into the drafting step label
- */
+import { useEffect, useRef } from "react";
 
-const STEPS = (activeLead) => [
-  {
-    id: "searching",
-    icon: "🔎",
-    label: "Searching prospects",
-    detail: "Running diversified LinkedIn queries via Tavily",
-  },
-  {
-    id: "enriching",
-    icon: "📬",
-    label: "Enriching lead data",
-    detail: "Extracting profiles, resolving domains & verifying emails",
-  },
-  {
-    id: "drafting-v1",
-    icon: "✍️",
-    label: activeLead ? `Drafting Variant 1 — ${activeLead}` : "Drafting Variant 1",
-    detail: "Generating personalised first draft via Nova Micro",
-  },
-  {
-    id: "generating",
-    icon: "🔁",
-    label: "Generating Variants 2 and 3",
-    detail: "Creating alternatives and selecting the best-scoring email",
-  },
-  {
-    id: "ready",
-    icon: "✅",
-    label: "Ready",
-    detail: "All leads processed — results ready below",
-  },
-];
+export default function AgentWindow({ logs = [] }) {
+  const endRef = useRef(null);
 
-const STEP_IDS = ["searching", "enriching", "drafting-v1", "generating", "ready"];
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
 
-export default function AgentWindow({ currentStep, activeLead }) {
-  const currentIdx = STEP_IDS.indexOf(currentStep);
-  const steps = STEPS(activeLead);
+  const getLogColor = (log) => {
+    if (log.includes("⚠️") || log.includes("❌") || log.includes("Failed")) return "#ef4444";
+    if (log.includes("✅") || log.includes("📩") || log.includes("Connected")) return "#10b981";
+    if (log.includes("🔍") || log.includes("🔎") || log.includes("Warming")) return "#60a5fa";
+    if (log.includes("⏳") || log.includes("📅") || log.includes("queued")) return "#f59e0b";
+    if (log.includes("🚀") || log.includes("▶") || log.includes("Launch")) return "#a78bfa";
+    if (log.includes("📊") || log.includes("🎯")) return "#fb923c";
+    return "#e2e8f0";
+  };
+
+  const getPrefix = (log) => {
+    const t = new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return t;
+  };
 
   return (
     <div
       style={{
-        background: "#ffffff",
-        border: "1px solid #eaedf3",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+        background: "#0d1117",
+        border: "1px solid #21262d",
+        boxShadow: "0 0 0 1px #30363d, 0 8px 24px rgba(0,0,0,0.4)",
         borderRadius: "12px",
-        padding: "20px 24px",
-        marginBottom: "20px",
-        maxHeight: "260px",
-        overflowY: "auto",
-        fontFamily: "Inter, -apple-system, sans-serif",
+        overflow: "hidden",
+        marginBottom: "24px",
       }}
     >
-      {/* Header */}
+      {/* Terminal chrome */}
       <div
         style={{
+          background: "#161b22",
+          borderBottom: "1px solid #21262d",
+          padding: "10px 16px",
           display: "flex",
           alignItems: "center",
           gap: "8px",
-          marginBottom: "16px",
-          fontSize: "16px",
-          color: "#1e293b",
-          fontWeight: 700,
         }}
       >
-        <span
-          style={{
-            display: "inline-block",
-            width: "8px",
-            height: "8px",
-            borderRadius: "50%",
-            background:
-              currentStep === "ready" ? "#10b981" : "#4f46e5",
-            animation:
-              currentStep !== "ready" ? "agentPulse 1.2s ease-in-out infinite" : "none",
-          }}
-        />
-        Agent Thinking
+        <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57", display: "inline-block" }} />
+        <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#febc2e", display: "inline-block" }} />
+        <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840", display: "inline-block" }} />
+        <span style={{
+          marginLeft: "12px", fontSize: "12px", color: "#8b949e",
+          fontFamily: "'Fira Code', 'Courier New', monospace", fontWeight: 500
+        }}>
+          outreach-agent — bash
+        </span>
+        <span style={{
+          marginLeft: "auto",
+          display: "inline-flex", alignItems: "center", gap: "6px",
+          fontSize: "11px", color: "#3fb950", fontWeight: 600,
+          fontFamily: "Inter, sans-serif"
+        }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: "50%", background: "#3fb950",
+            animation: "agentPulse 1.2s ease-in-out infinite", display: "inline-block"
+          }} />
+          LIVE
+        </span>
       </div>
 
-      {/* Step list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        {steps.map((step, idx) => {
-          const isDone    = idx < currentIdx;
-          const isActive  = idx === currentIdx;
-          const isPending = idx > currentIdx;
-
-          return (
-            <div
-              key={step.id}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "12px",
-                opacity: isPending ? 0.4 : 1,
-                transition: "opacity 0.3s ease",
-              }}
-            >
-              {/* Status icon column */}
-              <div style={{ width: "20px", flexShrink: 0, textAlign: "center", paddingTop: "2px" }}>
-                {isDone ? (
-                  <span style={{ color: "#10b981", fontSize: "14px" }}>✓</span>
-                ) : isActive ? (
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      background: "#4f46e5",
-                      animation: "agentPulse 1.2s ease-in-out infinite",
-                      marginTop: "4px",
-                    }}
-                  />
-                ) : (
-                  <span style={{ color: "#cbd5e1", fontSize: "14px" }}>○</span>
-                )}
-              </div>
-
-              {/* Text column */}
-              <div>
-                <div
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: isActive ? 600 : 500,
-                    color: isDone
-                      ? "#10b981"
-                      : isActive
-                      ? "#1e293b"
-                      : "#64748b",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
-                >
-                  <span>{step.icon}</span>
-                  <span>{step.label}</span>
-                </div>
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: isDone ? "#64748b" : isActive ? "#64748b" : "#94a3b8",
-                    marginTop: "4px",
-                    lineHeight: "1.5",
-                  }}
-                >
-                  {step.detail}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      {/* Log body */}
+      <div
+        style={{
+          height: "260px",
+          overflowY: "auto",
+          padding: "16px 20px",
+          fontFamily: "'Fira Code', 'Courier New', monospace",
+          fontSize: "12.5px",
+          lineHeight: "1.7",
+        }}
+      >
+        {logs.map((log, idx) => (
+          <div key={idx} style={{ display: "flex", gap: "12px", marginBottom: "2px" }}>
+            <span style={{ color: "#484f58", flexShrink: 0, userSelect: "none" }}>
+              {String(idx + 1).padStart(3, "0")}
+            </span>
+            <span style={{ color: "#484f58", flexShrink: 0, userSelect: "none" }}>│</span>
+            <span style={{ color: getLogColor(log), wordBreak: "break-all" }}>
+              {log}
+            </span>
+          </div>
+        ))}
+        {logs.length === 0 && (
+          <div style={{ color: "#484f58", fontStyle: "italic" }}>$ Initializing agent...</div>
+        )}
+        <div ref={endRef} />
       </div>
 
-      {/* Inline keyframes */}
       <style>{`
         @keyframes agentPulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50%       { opacity: 0.4; transform: scale(0.85); }
         }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #484f58; }
       `}</style>
     </div>
   );

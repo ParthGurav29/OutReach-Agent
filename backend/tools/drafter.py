@@ -1,3 +1,14 @@
+"""
+drafter.py — LinkedIn DM Drafter (CCQ Method)
+----------------------------------------------
+Generates 3 variants of LinkedIn Direct Messages using the CCQ framework:
+  1. Compliment  — opens with a genuine compliment about their work / company.
+  2. Commonality — opens by surfacing a shared experience, mutual connection, or interest.
+  3. Question    — opens with a thought-provoking question related to their context.
+
+Each DM is kept at 50–80 words to respect LinkedIn message etiquette.
+"""
+
 import os
 import json
 import boto3
@@ -8,7 +19,7 @@ from backend.tools.quality_checker import review_email
 
 load_dotenv()
 
-MODEL_ID = os.getenv("NOVA_MICRO_MODEL_ID")
+MODEL_ID   = os.getenv("NOVA_MICRO_MODEL_ID")
 AWS_REGION = os.getenv("AWS_REGION")
 
 if not MODEL_ID:
@@ -19,91 +30,124 @@ if not AWS_REGION:
 bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 
 
-async def call_model(prompt):
-    loop = asyncio.get_running_loop()
-    response = await loop.run_in_executor(
-        None,
-        lambda: bedrock.invoke_model(
-            modelId=MODEL_ID,
-            body=json.dumps({
-                "messages": [{"role": "user", "content": [{"text": prompt}]}],
-                "inferenceConfig": {"maxTokens": 500, "temperature": 0.6}
-            })
-        )
-    )
-    raw = json.loads(response["body"].read())
-    text = raw["output"]["message"]["content"][0]["text"].strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-    try:
-        return json.loads(text)
-    except:
-        return None
+# ─────────────────────────────────────────────────────────────────
+# Bedrock LLM wrapper
+# ─────────────────────────────────────────────────────────────────
+
+async def call_model(prompt: str):
+    body = {
+        "messages": [{"role": "user", "content": [{"text": prompt}]}],
+        "inferenceConfig": {"maxTokens": 600, "temperature": 0.65},
+    }
+    body_str = json.dumps(body)
+
+    for attempt in range(3):
+        try:
+            response = await asyncio.to_thread(
+                bedrock.invoke_model,
+                modelId=MODEL_ID,
+                body=body_str,
+            )
+            raw  = json.loads(response["body"].read())
+            text = raw["output"]["message"]["content"][0]["text"].strip()
+
+            # Strip markdown code fences if present
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+
+            return json.loads(text)
+
+        except Exception as e:
+            print(f"⚠️ Drafter Model call failed (attempt {attempt + 1}): {e}")
+            if attempt == 2:
+                return None
+            await asyncio.sleep(1.5)
 
 
-async def generate_variants(prospect, goal, tone, personal_context, sender_name, seeking):
+# ─────────────────────────────────────────────────────────────────
+# CCQ LinkedIn DM Generator
+# ─────────────────────────────────────────────────────────────────
 
-    # Build sender identity block
-    sender_identity = f"My name is {sender_name}" if sender_name else "I'm reaching out"
+async def generate_linkedin_dms(
+    prospect: dict,
+    goal: str,
+    tone: str,
+    personal_context: str,
+    sender_name: str,
+    seeking: str,
+    proxycurl_data: dict | None = None,
+) -> list | None:
+    """
+    Generates 3 LinkedIn DM variants using the CCQ method.
+    Optionally uses Proxycurl data (bio, recent_posts, skills) for richer personalisation.
+    """
+
+    sender_identity = f"I'm {sender_name}" if sender_name else "I'm reaching out"
     if seeking:
-        sender_identity += f" and I'm seeking {seeking}"
+        sender_identity += f", {seeking}"
+
+    # Build enrichment block from Proxycurl if available
+    enrichment_block = ""
+    if proxycurl_data:
+        bio          = proxycurl_data.get("bio", "")
+        headline     = proxycurl_data.get("headline", "")
+        recent_posts = proxycurl_data.get("recent_posts", [])
+        skills       = proxycurl_data.get("skills", [])
+
+        if headline:
+            enrichment_block += f"\nHeadline: {headline}"
+        if bio:
+            enrichment_block += f"\nBio / Summary: {bio[:300]}"
+        if recent_posts:
+            enrichment_block += f"\nRecent Activity: {'; '.join(recent_posts[:2])}"
+        if skills:
+            enrichment_block += f"\nTop Skills: {', '.join(skills[:5])}"
 
     prompt = f"""
-You are writing cold outreach emails ON BEHALF OF {sender_name or "the sender"}.
+You are writing LinkedIn DMs ON BEHALF OF {sender_name or "the sender"}.
 
-SENDER IDENTITY:
-{sender_identity}
+SENDER: {sender_identity}
+CAMPAIGN GOAL: {goal}
+TONE: {tone}
 
 PROSPECT:
 Name: {prospect.get("name")}
 Role: {prospect.get("role")}
 Company: {prospect.get("company", "")}
+LinkedIn Context: {personal_context}
+{enrichment_block}
 
-PERSONALISATION CONTEXT (reference this in the FIRST sentence):
-{personal_context}
+CCQ METHOD — Generate exactly 3 LinkedIn DM variants:
 
-CAMPAIGN GOAL:
-{goal}
+1. "Compliment"  — Open with a GENUINE and SPECIFIC compliment about their work, company, or a recent achievement. Do NOT be generic.
+2. "Commonality" — Open by surfacing a REAL or PLAUSIBLE shared experience, interest, mutual connection, or industry challenge.
+3. "Question"    — Open with a THOUGHT-PROVOKING question directly relevant to their role or company situation.
 
-TONE:
-{tone}
+ALL 3 VARIANTS MUST FOLLOW THESE RULES:
+- 50–80 words ONLY — LinkedIn messages must be concise.
+- NO subject line — this is a DM, not an email.
+- Do NOT use: "I hope this finds you well", "I noticed your profile", "Just reaching out", "I came across your profile".
+- Make it feel HUMAN and WARM, not salesy.
+- Include ONE soft CTA (e.g., "Would you be open to a quick 15-min chat?").
+- Sign off as "{sender_name}" only.
+- ZERO placeholders like [Name], [Company], [Your Name].
 
-STRICT RULES:
-1. First sentence MUST reference the personalisation context — name a specific project, newsletter, company, or achievement.
-2. Subject MUST reference the personalisation context.
-3. NEVER use: "I hope this finds you well", "I noticed your background in", "Just reaching out", "I came across your profile".
-4. The email must clearly state WHO the sender is and WHAT they are seeking.
-5. Body must be 80–120 words.
-6. End with ONE soft CTA.
-7. Sign off as "{sender_name}" only — no title, no placeholders.
-8. ZERO placeholders like [Your Name], [Company], [Position].
-
-You MUST generate exactly 3 variations of the email:
-1. "Direct" type: Get straight to the point and the ask.
-2. "Value" type: Focus more on the value proposition and why it matters to them.
-3. "Question" type: End with a thought-provoking question related to their context.
-
-Return ONLY valid JSON containing an array of exactly 3 objects (one for each type).
-Use exactly these keys: "type", "subject", "body", "personalisation_used".
-
+Return ONLY valid JSON — an array of exactly 3 objects:
 [
   {{
-    "type": "Direct",
-    "subject": "...",
+    "type": "Compliment",
     "body": "...",
     "personalisation_used": "..."
   }},
   {{
-    "type": "Value",
-    "subject": "...",
+    "type": "Commonality",
     "body": "...",
     "personalisation_used": "..."
   }},
   {{
     "type": "Question",
-    "subject": "...",
     "body": "...",
     "personalisation_used": "..."
   }}
@@ -117,36 +161,37 @@ Use exactly these keys: "type", "subject", "body", "personalisation_used".
     valid_variants = []
     for r in result:
         body = r.get("body", "")
-        if "[" not in body and "]" not in body:
+        if body and "[" not in body and "]" not in body:
             r["word_count"] = len(body.split())
+            # Add a synthetic subject for UI compatibility (not used in DM)
+            r["subject"] = f"LinkedIn DM — {r.get('type', '')}"
             valid_variants.append(r)
 
-    if not valid_variants:
-        return None
-
-    return valid_variants
+    return valid_variants or None
 
 
-async def expand_email(email_body, sender_name, seeking):
+# ─────────────────────────────────────────────────────────────────
+# Fallback DM expander
+# ─────────────────────────────────────────────────────────────────
+
+async def expand_dm(dm_body: str, sender_name: str, seeking: str) -> dict | None:
     seek_line = f"seeking {seeking}" if seeking else ""
     prompt = f"""
-Rewrite this email. Written by {sender_name} {seek_line}.
-- 80 to 120 words
-- Keep same personalisation and subject
+Rewrite this LinkedIn DM. Written by {sender_name} {seek_line}.
+- 50 to 80 words
+- Keep same personalisation hook
 - Make the sender's identity and ask clear
 - Sign off as "{sender_name}"
 - ZERO placeholders
 
 Return ONLY valid JSON:
 {{
-  "subject": "...",
   "body": "...",
-  "personalisation_used": "...",
-  "word_count": <integer>
+  "personalisation_used": "..."
 }}
 
-EMAIL:
-{email_body}
+DM:
+{dm_body}
 """
     result = await call_model(prompt)
     if result:
@@ -154,8 +199,27 @@ EMAIL:
     return result
 
 
-async def draft_email(prospect: dict, goal: str, tone: str, sender_name: str = "", seeking: str = ""):
+# ─────────────────────────────────────────────────────────────────
+# Main entry point (called by orchestrator)
+# ─────────────────────────────────────────────────────────────────
 
+async def draft_email(
+    prospect: dict,
+    goal: str,
+    tone: str,
+    sender_name: str = "",
+    seeking: str = "",
+    proxycurl_data: dict | None = None,
+):
+    """
+    Main drafting function. Now generates LinkedIn DMs via CCQ method.
+    The return shape is backwards-compatible with the existing orchestrator/UI:
+      {
+        "subject": str,         # synthetic — "LinkedIn DM — Compliment"
+        "body": str,            # body of first (Compliment) variant
+        "variants": [...],      # all 3 CCQ variants
+      }
+    """
     personal_context = (
         prospect.get("personalisation_hook")
         or prospect.get("recent_work")
@@ -167,79 +231,86 @@ async def draft_email(prospect: dict, goal: str, tone: str, sender_name: str = "
     if not sender_name:
         sender_name = os.getenv("SENDER_NAME", "the team")
 
-    variants = await generate_variants(
-        prospect, goal, tone, personal_context, sender_name, seeking
+    # ── Generate CCQ DMs ──────────────────────────────────────────
+    variants = await generate_linkedin_dms(
+        prospect        = prospect,
+        goal            = goal,
+        tone            = tone,
+        personal_context = personal_context,
+        sender_name     = sender_name,
+        seeking         = seeking,
+        proxycurl_data  = proxycurl_data,
     )
 
+    # ── Fallback if generation failed ────────────────────────────
     if not variants:
-        seek_line = f"seeking {seeking}" if seeking else ""
+        seek_line    = f"seeking {seeking}" if seeking else ""
         fallback_body = (
             f"Hi {prospect.get('name', 'there')},\n\n"
-            f"I came across {personal_context} and wanted to reach out.\n\n"
-            f"I'm {sender_name}{', ' + seek_line if seek_line else ''}. {goal}.\n\n"
-            f"Would you be open to a quick chat?\n\n"
-            f"{sender_name}"
+            f"Really admire what {prospect.get('company', 'your team')} is building. "
+            f"I'm {sender_name}{', ' + seek_line if seek_line else ''}.\n\n"
+            f"Would you be open to a quick 15-min chat?\n\n{sender_name}"
         )
         variants = [
             {
-                "type": "Direct",
-                "subject": f"Quick thought on {prospect.get('company', 'your work')}",
+                "type": "Compliment",
+                "subject": "LinkedIn DM — Compliment",
                 "body": fallback_body,
                 "personalisation_used": personal_context,
                 "word_count": len(fallback_body.split()),
-                "quality_review": {"passed": False, "issues": ["fallback used"], "score": 0}
+                "quality_review": {"passed": False, "issues": ["fallback used"], "score": 0},
             },
             {
-                "type": "Value",
-                "subject": f"Value for {prospect.get('company', 'your work')}",
+                "type": "Commonality",
+                "subject": "LinkedIn DM — Commonality",
                 "body": fallback_body,
                 "personalisation_used": personal_context,
                 "word_count": len(fallback_body.split()),
-                "quality_review": {"passed": False, "issues": ["fallback used"], "score": 0}
+                "quality_review": {"passed": False, "issues": ["fallback used"], "score": 0},
             },
             {
                 "type": "Question",
-                "subject": f"Question about {prospect.get('company', 'your work')}",
+                "subject": "LinkedIn DM — Question",
                 "body": fallback_body,
                 "personalisation_used": personal_context,
                 "word_count": len(fallback_body.split()),
-                "quality_review": {"passed": False, "issues": ["fallback used"], "score": 0}
-            }
+                "quality_review": {"passed": False, "issues": ["fallback used"], "score": 0},
+            },
         ]
         return {
-            "subject": variants[0].get("subject", ""),
-            "body": variants[0].get("body", ""),
-            "variants": variants
+            "subject": variants[0]["subject"],
+            "body": variants[0]["body"],
+            "variants": variants,
         }
 
-    for idx, email in enumerate(variants):
-        wc = email.get("word_count", 0)
-
-        if wc < 80:
-            print(f"⚠️ Email too short ({wc}w) → expanding")
-            expanded = await expand_email(email["body"], sender_name, seeking)
+    # ── Expand too-short DMs and quality-check ───────────────────
+    for variant in variants:
+        wc = variant.get("word_count", 0)
+        if wc < 50:
+            print(f"⚠️ DM too short ({wc}w) → expanding for {prospect.get('name')}")
+            expanded = await expand_dm(variant["body"], sender_name, seeking)
             if expanded:
-                email["body"] = expanded.get("body", email["body"])
-                email["word_count"] = len(email["body"].split())
+                variant["body"]       = expanded.get("body", variant["body"])
+                variant["word_count"] = len(variant["body"].split())
 
         review = review_email(
-            email=email["body"],
-            prospect_profile=prospect,
-            goal=goal,
-            tone=tone
+            email            = variant["body"],
+            prospect_profile = prospect,
+            goal             = goal,
+            tone             = tone,
         )
-        email["quality_review"] = review
-        print(f"\n🧪 QUALITY — {prospect.get('name')} ({email.get('type')}) | score: {review.get('score', '?')}")
+        variant["quality_review"] = review
+        print(f"🧪 QUALITY — {prospect.get('name')} ({variant.get('type')}) | score: {review.get('score', '?')}")
 
         if not review.get("passed"):
             rewritten = review.get("rewritten_email")
             if rewritten:
-                email["body"] = rewritten
-                email["word_count"] = len(rewritten.split())
+                variant["body"]       = rewritten
+                variant["word_count"] = len(rewritten.split())
 
     default = variants[0]
     return {
-        "subject": default.get("subject", ""),
-        "body": default.get("body", ""),
-        "variants": variants
+        "subject": default.get("subject", "LinkedIn DM"),
+        "body":    default.get("body", ""),
+        "variants": variants,
     }

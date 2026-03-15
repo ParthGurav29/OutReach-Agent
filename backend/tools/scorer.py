@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 import boto3
 from dotenv import load_dotenv
 
@@ -63,34 +64,46 @@ Format:
         }
     }
 
-    response = bedrock.invoke_model(
-        modelId=MODEL_ID,
-        body=json.dumps(body)
-    )
+    body_str = json.dumps(body)
 
-    response_body = json.loads(response["body"].read())
+    for attempt in range(3):
+        try:
+            response = await asyncio.to_thread(
+                bedrock.invoke_model,
+                modelId=MODEL_ID,
+                body=body_str
+            )
+            response_body = json.loads(response["body"].read())
+            text_output = response_body["output"]["message"]["content"][0]["text"]
 
-    text_output = response_body["output"]["message"]["content"][0]["text"]
+            # Clean markdown if model adds it
+            text_output = text_output.replace("```json", "").replace("```", "").strip()
 
-    # Clean markdown if model adds it
-    text_output = text_output.replace("```json", "").replace("```", "").strip()
+            try:
+                result = json.loads(text_output)
+                return {
+                    "prospect": prospect,
+                    "score": result.get("score"),
+                    "reason": result.get("reason")
+                }
+            except Exception:
+                print("⚠️ Scoring parse failed")
+                print(text_output)
+                return {
+                    "prospect": prospect,
+                    "score": None,
+                    "reason": "parse_failed"
+                }
 
-    try:
-        result = json.loads(text_output)
+        except Exception as e:
+            print(f"⚠️ Bedrock scorer error (attempt {attempt + 1}): {e}")
+            if attempt == 2:
+                return {
+                    "prospect": prospect,
+                    "score": None,
+                    "reason": "api_error"
+                }
+            await asyncio.sleep(1.5)
 
-        return {
-            "prospect": prospect,
-            "score": result.get("score"),
-            "reason": result.get("reason")
-        }
-
-    except Exception:
-
-        print("⚠️ Scoring parse failed")
-        print(text_output)
-
-        return {
-            "prospect": prospect,
-            "score": None,
-            "reason": "parse_failed"
-        }
+    # Should never reach here, but safety net
+    return {"prospect": prospect, "score": None, "reason": "unknown_error"}

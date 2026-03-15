@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 import boto3
 from dotenv import load_dotenv
 
@@ -18,7 +19,7 @@ client = boto3.client(
 # MODEL CALL
 # ---------------------------------------------------
 
-def call_model(prompt: str):
+async def call_model(prompt: str):
 
     body = {
         "messages": [
@@ -33,29 +34,32 @@ def call_model(prompt: str):
         }
     }
 
-    try:
+    body_str = json.dumps(body)
+    
+    for attempt in range(3):
+        try:
+            response = await asyncio.to_thread(
+                client.invoke_model,
+                modelId=MODEL_ID,
+                body=body_str
+            )
 
-        response = client.invoke_model(
-            modelId=MODEL_ID,
-            body=json.dumps(body)
-        )
+            raw = json.loads(response["body"].read())
+            text = raw["output"]["message"]["content"][0]["text"].strip()
 
-        raw = json.loads(response["body"].read())
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
 
-        text = raw["output"]["message"]["content"][0]["text"].strip()
+            return text.strip()
 
-        # remove markdown fences if model returns ```json
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
+        except Exception as e:
+            print(f"⚠️ Extractor Model call failed (attempt {attempt + 1}): {e}")
+            if attempt == 2:
+                return None
+            await asyncio.sleep(1.5)
 
-        return text.strip()
-
-    except Exception as e:
-
-        print("⚠️ Model call failed:", e)
-        return None
 
 
 # ---------------------------------------------------
@@ -104,7 +108,7 @@ Rules:
 
     try:
 
-        response = call_model(prompt)
+        response = await call_model(prompt)
 
         if not response:
             return None

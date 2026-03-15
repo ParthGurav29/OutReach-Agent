@@ -1,3 +1,17 @@
+"""
+orchestrator.py — LinkedIn Campaign Orchestrator
+-------------------------------------------------
+Pipeline:
+  1. Plan → generate search queries
+  2. Search → Tavily (LinkedIn-first)
+  3. Dedup by LinkedIn slug
+  4. Extract → prospect info
+  5. Proxycurl enrichment → deeper bio / recent posts
+  6. Score → quality filter
+  7. Draft → CCQ LinkedIn DMs
+  8. Attach 7-touch cadence tracker per prospect
+"""
+
 import re
 import asyncio
 
@@ -8,11 +22,25 @@ from backend.tools.extractor import extract_prospect
 from backend.tools.email_finder import find_email
 from backend.tools.scorer import score_prospect
 from backend.tools.drafter import draft_email
+from backend.tools.proxycurl_enricher import enrich_linkedin_profile
 
 
-MAX_RETRIES    = 2
+MAX_RETRIES        = 2
 MIN_GOOD_PROSPECTS = 5
 SCORE_THRESHOLD    = 60
+
+
+# ─────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────
+
+async def async_gather_chunks(coros, chunk_size=5):
+    results = []
+    for i in range(0, len(coros), chunk_size):
+        chunk = coros[i:i + chunk_size]
+        results.extend(await asyncio.gather(*chunk, return_exceptions=True))
+    # Filter out exceptions silently
+    return [r for r in results if not isinstance(r, Exception)]
 
 
 def _profile_slug(url: str) -> str | None:
@@ -20,27 +48,74 @@ def _profile_slug(url: str) -> str | None:
     return match.group(1).lower() if match else None
 
 
-async def plan_campaign(goal: str, session_id: str, sender_name: str = "", seeking: str = ""):
+# ─────────────────────────────────────────────────────────────────
+# 7-Touch Cadence Tracker
+# ─────────────────────────────────────────────────────────────────
 
-    print("\n🚀 Running campaign")
-    print("Goal:", goal)
-    print("Sender:", sender_name, "| Seeking:", seeking)
+CADENCE_STEPS = [
+    {"day": 0,  "touch": 1, "action": "Profile Viewed",        "status": "Day 0: Profile Viewed"},
+    {"day": 1,  "touch": 2, "action": "Post Liked",            "status": "Day 1: Post Liked"},
+    {"day": 2,  "touch": 3, "action": "Connection Sent",       "status": "Day 2: Connection Sent"},
+    {"day": 4,  "touch": 4, "action": "DM 1 Queued",           "status": "Day 4: DM 1 Queued"},
+    {"day": 7,  "touch": 5, "action": "Follow-up DM Queued",   "status": "Day 7: Follow-up DM Queued"},
+    {"day": 12, "touch": 6, "action": "Value Post Reaction",   "status": "Day 12: Value Post Reaction"},
+    {"day": 14, "touch": 7, "action": "Final DM Queued",       "status": "Day 14: Final DM Queued"},
+]
+
+
+def build_cadence(prospect_name: str) -> dict:
+    """Returns a 7-touch cadence dict for a prospect, starting at step 0."""
+    return {
+        "current_step": 0,
+        "current_status": CADENCE_STEPS[0]["status"],
+        "steps": CADENCE_STEPS,
+        "completed": False,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────
+# Main pipeline
+# ─────────────────────────────────────────────────────────────────
+
+async def plan_campaign(
+    goal: str,
+    session_id: str,
+    sender_name: str = "",
+    seeking: str = "",
+    log_callback=None,
+):
+    """
+    Runs the full LinkedIn outreach pipeline.
+    `log_callback` is an optional async callable(str) for live log streaming.
+    """
+
+    async def log(msg: str):
+        print(msg)
+        if log_callback:
+            try:
+                await log_callback(msg)
+            except Exception:
+                pass
+
+    await log("\n🚀 Running LinkedIn campaign")
+    await log(f"Goal: {goal}")
+    await log(f"Sender: {sender_name} | Seeking: {seeking}")
 
     memory_context = build_memory_context(session_id)
-    session = get_session(session_id)
+    session        = get_session(session_id)
 
-    # STEP 1 — Plan
+    # ── STEP 1: Plan ────────────────────────────────────────────
     plan = await generate_campaign_plan(goal, memory_context)
 
     if not plan or "campaign_plan" not in plan:
-        print("⚠️ No campaign plan generated")
+        await log("⚠️ No campaign plan generated")
         return {}
 
     campaign_plan  = plan["campaign_plan"]
     search_queries = campaign_plan.get("search_queries", [])
 
     if not search_queries:
-        print("⚠️ No search queries generated")
+        await log("⚠️ No search queries generated")
         return {}
 
     retry_count        = 0
@@ -49,20 +124,16 @@ async def plan_campaign(goal: str, session_id: str, sender_name: str = "", seeki
     all_scored_results = []
 
     while True:
+        await log(f"\n🔎 SEARCH ATTEMPT {retry_count + 1}")
 
-        print(f"\n==============================")
-        print(f"🔎 SEARCH QUERIES (attempt {retry_count + 1})")
-        print("==============================")
-
+        # ── STEP 2: Search ──────────────────────────────────────
         all_results = []
         for query in search_queries[:5]:
-            print(f"🔍 {query}")
+            await log(f"🔍 Searching: {query}")
             results = await search_web(query)
-            for r in results:
-                print(r)
             all_results.extend(results)
 
-        # Dedup by LinkedIn slug, fallback to URL
+        # ── STEP 3: Dedup ───────────────────────────────────────
         new_results = []
         for r in all_results:
             url  = r.get("url", "")
@@ -76,47 +147,68 @@ async def plan_campaign(goal: str, session_id: str, sender_name: str = "", seeki
                     seen_urls.add(url)
                     new_results.append(r)
 
-        print(f"\nNEW UNIQUE: {len(new_results)} | TOTAL SEEN: {len(seen_slugs) + len(seen_urls)}\n")
+        await log(f"📋 {len(new_results)} new unique profiles found")
 
         if not new_results:
-            print("⚠️ No new results — skipping")
+            await log("⚠️ No new results — skipping extraction")
         else:
-            # STEP 4 — Extract
-            print("\n🧠 Extracting prospects...\n")
-            extracted = await asyncio.gather(*[extract_prospect(r) for r in new_results])
+            # ── STEP 4: Extract ─────────────────────────────────
+            await log("🧠 Extracting prospect data...")
+            extracted = await async_gather_chunks(
+                [extract_prospect(r) for r in new_results], chunk_size=5
+            )
             prospects = [p for p in extracted if p]
-
-            for p in prospects:
-                print("✅", p)
-
-            print(f"\nPROSPECTS: {len(prospects)}\n")
+            await log(f"✅ {len(prospects)} prospects extracted")
 
             if prospects:
-                # STEP 4.5 — Find emails
-                print("\n📬 Finding emails...\n")
+                # ── STEP 4.5: Proxycurl LinkedIn Enrichment ────
+                await log("🔗 Enriching profiles via LinkedIn data...")
 
-                async def enrich(p):
+                async def proxycurl_enrich(p):
+                    linkedin_url = p.get("linkedin_url") or p.get("url", "")
+                    if "linkedin.com/in/" in (linkedin_url or "").lower():
+                        pc_data = await enrich_linkedin_profile(linkedin_url)
+                        if pc_data:
+                            # Merge richer context back into prospect
+                            if pc_data.get("bio") and not p.get("personalisation_hook"):
+                                p["personalisation_hook"] = pc_data["bio"][:200]
+                            if pc_data.get("recent_posts"):
+                                p["recent_work"] = "; ".join(pc_data["recent_posts"][:2])
+                            if pc_data.get("skills") and not p.get("skills"):
+                                p["skills"] = pc_data["skills"]
+                            p["proxycurl_data"] = pc_data
+                    return p
+
+                enriched_prospects = await async_gather_chunks(
+                    [proxycurl_enrich(p) for p in prospects], chunk_size=3
+                )
+                prospects = [p for p in enriched_prospects if p]
+
+                # ── STEP 4.6: Email discovery (for fallback) ───
+                await log("📬 Finding emails (fallback channel)...")
+
+                async def find_email_for(p):
                     result = await find_email(
                         first   = p.get("first_name", ""),
                         last    = p.get("last_name", ""),
                         company = p.get("company", ""),
-                        domain  = p.get("company_domain")
+                        domain  = p.get("company_domain"),
                     )
                     p["email"]            = result.get("email")
                     p["email_confidence"] = result.get("confidence")
-                    print(f"   {p.get('name')} → {result.get('email')} [{result.get('reason')}]")
+                    await log(f"   📧 {p.get('name')} → {result.get('email') or 'not found'}")
                     return p
 
-                enriched = await asyncio.gather(*[enrich(p) for p in prospects])
+                enriched = await async_gather_chunks(
+                    [find_email_for(p) for p in prospects], chunk_size=5
+                )
 
-                resolved   = [p for p in enriched if p.get("email")]
-                unresolved = [p for p in enriched if not p.get("email")]
-                print(f"✅ Emails found: {len(resolved)} | ❌ Unresolved: {len(unresolved)}")
-
-                # STEP 5 — Score
-                print("\n🎯 Scoring...\n")
-                scored = await asyncio.gather(*[score_prospect(goal, p) for p in enriched])
-                scored = [r for r in scored if r["score"] is not None]
+                # ── STEP 5: Score ───────────────────────────────
+                await log("🎯 Scoring prospects...")
+                scored = await async_gather_chunks(
+                    [score_prospect(goal, p) for p in enriched], chunk_size=5
+                )
+                scored = [r for r in scored if isinstance(r, dict) and r.get("score") is not None]
                 all_scored_results.extend(scored)
 
         # Sort + dedup by name
@@ -130,62 +222,66 @@ async def plan_campaign(goal: str, session_id: str, sender_name: str = "", seeki
                 deduped.append(r)
         all_scored_results = deduped
 
-        print("\n🏆 TOP PROSPECTS\n")
-        for r in all_scored_results:
-            p = r["prospect"]
-            email_tag = f"📧 {p.get('email')}" if p.get("email") else "❌ no email"
-            print(f"{r['score']} — {p.get('name')} ({p.get('role')}) | {email_tag}")
-
         good = [r for r in all_scored_results if r["score"] >= SCORE_THRESHOLD]
-        print(f"\n⭐ Scoring ≥ {SCORE_THRESHOLD}: {len(good)}")
+        await log(f"⭐ {len(good)} prospects above score threshold ({SCORE_THRESHOLD})")
 
         if len(good) >= MIN_GOOD_PROSPECTS:
-            print("✅ Quality threshold met.")
+            await log("✅ Quality threshold met.")
             break
 
         if retry_count >= MAX_RETRIES:
-            print(f"⚠️ Max retries reached.")
+            await log(f"⚠️ Max retries reached — proceeding with {len(all_scored_results)} prospects")
             break
 
-        print("\n⚡ Adapting strategy...")
-        feedback = "\nPrevious searches returned poor results. Generate COMPLETELY DIFFERENT queries.\n"
-        plan = await generate_campaign_plan(goal, memory_context + feedback)
+        await log("\n⚡ Adapting search strategy...")
+        feedback       = "\nPrevious searches returned poor results. Generate COMPLETELY DIFFERENT queries.\n"
+        plan           = await generate_campaign_plan(goal, memory_context + feedback)
         campaign_plan  = plan.get("campaign_plan", {})
         search_queries = campaign_plan.get("search_queries", search_queries)
         retry_count   += 1
-        print(f"🔁 Retry #{retry_count} | Queries: {search_queries}")
+        await log(f"🔁 Retry #{retry_count}")
 
     scored_results = all_scored_results
 
     if not scored_results:
         return {"prospects_found": 0, "outreach_targets": []}
 
-    # STEP 6 — Draft emails
-    print("\n✉️ Drafting emails...\n")
+    # ── STEP 6: Draft LinkedIn DMs ───────────────────────────────
+    await log(f"\n💬 Drafting LinkedIn DMs for {len(scored_results)} prospects...")
     tone = campaign_plan.get("tone", "friendly and professional")
 
-    emails = await asyncio.gather(*[
-        draft_email(r["prospect"], goal, tone, sender_name, seeking)
-        for r in scored_results
-    ])
+    async def draft_for(r):
+        proxycurl_data = r["prospect"].get("proxycurl_data")
+        return await draft_email(
+            prospect       = r["prospect"],
+            goal           = goal,
+            tone           = tone,
+            sender_name    = sender_name,
+            seeking        = seeking,
+            proxycurl_data = proxycurl_data,
+        )
 
-    print(f"✅ {len(emails)} emails drafted")
+    dms = await async_gather_chunks([draft_for(r) for r in scored_results], chunk_size=5)
+    await log(f"✅ {len(dms)} LinkedIn DMs drafted")
 
-    for i, email in enumerate(emails):
-        p = scored_results[i]["prospect"]
-        print(f"\n-----")
-        print(f"Prospect: {p.get('name')} | Email: {p.get('email') or 'not found'}")
-        print(f"Subject: {email.get('subject')}")
-        print(f"Personalisation: {email.get('personalisation_used')}")
-        print(f"Word count: {email.get('word_count')}")
-        print(email.get("body"))
+    # ── STEP 7: Attach 7-touch cadence ──────────────────────────
+    await log("📅 Building 7-touch cadence trackers...")
 
-    outreach_results = [
-        {"prospect": scored_results[i]["prospect"], "score": scored_results[i]["score"], "email": emails[i]}
-        for i in range(len(emails))
-    ]
+    outreach_results = []
+    for i, dm in enumerate(dms):
+        prospect = scored_results[i]["prospect"]
+        cadence  = build_cadence(prospect.get("name", ""))
+        outreach_results.append({
+            "prospect": prospect,
+            "score":    scored_results[i]["score"],
+            "email":    dm,        # kept as "email" for UI compatibility
+            "cadence":  cadence,
+        })
+        await log(f"📩 Queued: {prospect.get('name')} — {cadence['current_status']}")
+
+    await log(f"\n🎉 Campaign ready! {len(outreach_results)} prospects in 7-touch cadence.")
 
     return {
-        "prospects_found": len(scored_results),
-        "outreach_targets": outreach_results
+        "prospects_found":  len(scored_results),
+        "outreach_targets": outreach_results,
     }

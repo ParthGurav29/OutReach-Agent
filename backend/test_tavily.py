@@ -1,6 +1,6 @@
 from tavily import TavilyClient
 
-client = TavilyClient(api_key="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")
+client = TavilyClient(api_key="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")
 
 response = client.search(
     query="latest AI outreach tools 2026",
