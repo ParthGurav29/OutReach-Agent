@@ -111,14 +111,14 @@ export default function App() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-xl font-bold text-[#E6EDF3]">
-                ReachAgent <span className="text-[#7D8590] font-normal">| AI Prospector</span>
+                Outreach Agent
               </h1>
-              <p className="text-[#7D8590] text-[11px] mt-1 font-medium italic">
-                Autonomous pipeline by <span className="text-[#FF9900]">Antigravity</span>
-              </p>
             </div>
-            <div className="flex gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[#7D8590] border border-[#30363D] px-2 py-1 rounded bg-[#0D1117]">Session: {sessionId}</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-[#0D1117] px-3 py-1.5 rounded-full border border-[#30363D] shadow-inner">
+                <div className="w-2 h-2 rounded-full bg-[#3FB950] animate-pulse"></div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#3FB950]">Session Active</span>
+              </div>
             </div>
           </div>
           
@@ -148,7 +148,7 @@ export default function App() {
                 <input 
                   value={jobRole} onChange={e => setJobRole(e.target.value)} disabled={isProcessing}
                   placeholder="e.g. Backend Engineer" 
-                  className="bg-[#161B22] border border-[#30363D] rounded-md p-1.5 text-xs text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:ring-[#FF9900] focus:outline-none transition-all"
+                  className="bg-[#161B22] border border-[#444c56] rounded-md p-1.5 text-xs text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:ring-[#FF9900] focus:border-[#FF9900] focus:outline-none transition-all"
                 />
               </div>
               <div className="flex flex-col gap-1">
@@ -156,12 +156,12 @@ export default function App() {
                 <input 
                   value={filterLocation} onChange={e => setFilterLocation(e.target.value)} disabled={isProcessing}
                   placeholder="e.g. Mumbai, Remote" 
-                  className="bg-[#161B22] border border-[#30363D] rounded-md p-1.5 text-xs text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:ring-[#FF9900] focus:outline-none transition-all"
+                  className="bg-[#161B22] border border-[#444c56] rounded-md p-1.5 text-xs text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:ring-[#FF9900] focus:border-[#FF9900] focus:outline-none transition-all"
                 />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-[#7D8590] uppercase px-1">Industry</label>
-                <select value={industry} onChange={e => setIndustry(e.target.value)} disabled={isProcessing} className="bg-[#161B22] border border-[#30363D] rounded-md p-1.5 text-xs text-[#E6EDF3] focus:ring-1 focus:ring-[#FF9900] focus:outline-none transition-all appearance-none cursor-pointer">
+                <select value={industry} onChange={e => setIndustry(e.target.value)} disabled={isProcessing} className="bg-[#161B22] border border-[#444c56] rounded-md p-1.5 text-xs text-[#E6EDF3] focus:ring-1 focus:ring-[#FF9900] focus:border-[#FF9900] focus:outline-none transition-all appearance-none cursor-pointer">
                   <option value="">Any Industry</option>
                   <option value="Tech">Tech</option>
                   <option value="Finance">Finance</option>
@@ -173,7 +173,7 @@ export default function App() {
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-[#7D8590] uppercase px-1">Experience</label>
-                <select value={experience} onChange={e => setExperience(e.target.value)} disabled={isProcessing} className="bg-[#161B22] border border-[#30363D] rounded-md p-1.5 text-xs text-[#E6EDF3] focus:ring-1 focus:ring-[#FF9900] focus:outline-none transition-all appearance-none cursor-pointer">
+                <select value={experience} onChange={e => setExperience(e.target.value)} disabled={isProcessing} className="bg-[#161B22] border border-[#444c56] rounded-md p-1.5 text-xs text-[#E6EDF3] focus:ring-1 focus:ring-[#FF9900] focus:border-[#FF9900] focus:outline-none transition-all appearance-none cursor-pointer">
                   <option value="Any">Any Experience</option>
                   <option value="Junior">Junior</option>
                   <option value="Mid">Mid</option>
@@ -185,7 +185,7 @@ export default function App() {
               
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-[#7D8590] uppercase px-1">Job Type</label>
-                <div className="flex bg-[#161B22] rounded-md p-0.5 border border-[#30363D] h-[34px]">
+                <div className="flex bg-[#161B22] rounded-md p-0.5 border border-[#444c56] h-[34px]">
                   {['Any', 'Onsite', 'Remote', 'Hybrid'].map(type => (
                     <button
                       key={type}
@@ -200,7 +200,7 @@ export default function App() {
               
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-[#7D8590] uppercase px-1">Company Size</label>
-                <select value={companySize} onChange={e => setCompanySize(e.target.value)} disabled={isProcessing} className="bg-[#161B22] border border-[#30363D] rounded-md p-1.5 text-xs text-[#E6EDF3] focus:ring-1 focus:ring-[#FF9900] focus:outline-none transition-all appearance-none cursor-pointer">
+                <select value={companySize} onChange={e => setCompanySize(e.target.value)} disabled={isProcessing} className="bg-[#161B22] border border-[#444c56] rounded-md p-1.5 text-xs text-[#E6EDF3] focus:ring-1 focus:ring-[#FF9900] focus:border-[#FF9900] focus:outline-none transition-all appearance-none cursor-pointer">
                   <option value="Any">Any size</option>
                   <option value="Startup (1-50)">Startup (1–50)</option>
                   <option value="Small (51-200)">Small (51–200)</option>
@@ -214,7 +214,7 @@ export default function App() {
                 <input 
                   value={keywords} onChange={e => setKeywords(e.target.value)} disabled={isProcessing}
                   placeholder="e.g. open source, YC alumni, fintech" 
-                  className="bg-[#161B22] border border-[#30363D] rounded-md p-1.5 text-xs text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:ring-[#FF9900] focus:outline-none transition-all w-full"
+                  className="bg-[#161B22] border border-[#444c56] rounded-md p-1.5 text-xs text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:ring-[#FF9900] focus:border-[#FF9900] focus:outline-none transition-all w-full"
                 />
               </div>
             </div>
@@ -247,18 +247,15 @@ export default function App() {
           </div>
           
           <div className="flex gap-4 items-end bg-[#1a1000] p-4 rounded-lg border border-[#30363D]/50">
-            <div className="flex-1 flex flex-col gap-2">
-              <label className="text-[10px] font-bold text-[#FF9900] uppercase px-1 tracking-[0.2em]">Define Prospect Persona</label>
               <input
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !isProcessing && goal.trim() ? handleRunCampaign() : null}
                 disabled={isProcessing}
-                placeholder="Find Python freelancers in Mumbai for a short-term contract"
-                className="w-full bg-[#161B22] border border-[#30363D] rounded-md p-3 text-sm text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:ring-[#FF9900] focus:outline-none transition-all shadow-inner"
+                placeholder="Find Python freelancers in Mumbai for a short-term contract..."
+                className="w-full bg-[#161B22] border border-[#444c56] rounded-md p-4 text-sm text-[#E6EDF3] placeholder:text-[#30363D] focus:ring-1 focus:ring-[#FF9900] focus:border-[#FF9900] focus:outline-none transition-all shadow-inner leading-relaxed"
                 autoFocus
               />
-            </div>
             <button
               onClick={handleRunCampaign}
               disabled={!goal.trim() || isProcessing}
@@ -293,6 +290,7 @@ export default function App() {
           )}
           
           {/* RESULTS GRID */}
+          {(isProcessing || prospects.length > 0) && (
           <div className="transition-all duration-700 ease-in-out flex flex-col gap-4 w-full">
             <h2 className="text-xs font-black border-b border-[#30363D] pb-3 mb-2 text-[#7D8590] uppercase tracking-[0.3em] flex justify-between items-center">
               <span>Pipeline Output</span>
@@ -323,7 +321,23 @@ export default function App() {
               ))}
             </div>
           </div>
+          )}
         </div>
+        <footer className="w-full py-12 mt-12 border-t border-[#30363D] flex flex-col items-center gap-4">
+          <div className="flex items-center gap-3 opacity-30 grayscale hover:grayscale-0 transition-all cursor-default group">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#7D8590]">Outreach Agent</span>
+            <div className="w-1 h-1 rounded-full bg-[#FF9900] group-hover:scale-150 transition-transform"></div>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#7D8590]">CoreDeployment v3.73</span>
+          </div>
+          <a 
+            href="https://parth-gurav-portfolio.netlify.app" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-[#7D8590] hover:text-[#FF9900] text-[13px] font-bold transition-all flex items-center gap-2 group"
+          >
+            Built by <span className="text-[#E6EDF3] group-hover:text-[#FF9900]">Parth Gurav</span> · BE IT '28, Mumbai · <span className="underline underline-offset-4 decoration-[#30363D] group-hover:decoration-[#FF9900]">parth-gurav-portfolio.netlify.app</span> <span className="text-[#FF9900] group-hover:translate-x-1 transition-transform">→</span>
+          </a>
+        </footer>
       </div>
       
       <ProspectDrawer 

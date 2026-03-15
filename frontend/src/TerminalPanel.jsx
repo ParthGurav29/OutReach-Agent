@@ -24,9 +24,9 @@ export function TerminalPanel({ logs, isSearching }) {
     <div className="bg-[#0D1117] rounded-xl overflow-hidden border border-[#30363D] shadow-2xl h-[280px] flex flex-col transition-all">
       {/* Terminal Header */}
       <div className="bg-[#161B22] px-4 py-2 flex gap-2 items-center border-b border-[#30363D]">
-        <div className="w-2.5 h-2.5 rounded-full bg-[#30363D]"></div>
-        <div className="w-2.5 h-2.5 rounded-full bg-[#30363D]"></div>
-        <div className="w-2.5 h-2.5 rounded-full bg-[#30363D]"></div>
+        <div className={`w-2.5 h-2.5 rounded-full dot-red${isSearching ? ' animate-traffic' : ''}`} style={{ opacity: isSearching ? undefined : 0.2 }}></div>
+        <div className={`w-2.5 h-2.5 rounded-full dot-yellow${isSearching ? ' animate-traffic' : ''}`} style={{ opacity: isSearching ? undefined : 0.2 }}></div>
+        <div className={`w-2.5 h-2.5 rounded-full dot-green${isSearching ? ' animate-traffic' : ''}`} style={{ opacity: isSearching ? undefined : 0.2 }}></div>
         <span className="text-[10px] font-mono text-[#7D8590] ml-2 border border-[#30363D] px-2 py-0.5 rounded-full uppercase tracking-widest bg-[#0D1117]">
           Live Pipeline Logs
         </span>

@@ -35,6 +35,20 @@ body {
 .dot-1 { animation-delay: 0.2s; }
 .dot-2 { animation-delay: 0.4s; }
 
+/* Fix 1: Traffic light sequential glow animation */
+@keyframes glow-dot {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); box-shadow: 0 0 6px currentColor; }
+}
+
+.dot-red   { color: #FF5F57; }
+.dot-yellow { color: #FFBD2E; }
+.dot-green  { color: #28CA41; }
+
+.dot-red.animate-traffic   { animation: glow-dot 1.2s ease-in-out infinite 0s; }
+.dot-yellow.animate-traffic { animation: glow-dot 1.2s ease-in-out infinite 0.4s; }
+.dot-green.animate-traffic  { animation: glow-dot 1.2s ease-in-out infinite 0.8s; }
+
 /* Custom Scrollbar for Dark Theme */
 ::-webkit-scrollbar {
   width: 8px;
@@ -59,7 +73,7 @@ body {
 }
 
 .animate-slide-in {
-  animation: slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes fade-in {
