@@ -8,5 +8,5 @@ cd frontend
 npm run dev
 
 
-
+python -m backend.tools.linkedin_sender --login
 
