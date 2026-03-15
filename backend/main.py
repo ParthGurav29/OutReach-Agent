@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from backend.agents.orchestrator import plan_campaign
 from backend.session_store import update_session, get_session
 from backend.tools.gmail_sender import send_gmail
+from backend.tools.linkedin_sender import send_linkedin_dm, ensure_linkedin_session
 
 
 app = FastAPI(title="LinkedIn Outreach AI Agent")
@@ -49,6 +50,12 @@ class SendEmailRequest(BaseModel):
 class LaunchCampaignRequest(BaseModel):
     session_id: str
     prospect_ids: list[int] = []   # which prospects to warm up (empty = all)
+
+
+class SendLinkedInDMRequest(BaseModel):
+    session_id: str
+    prospect_id: int
+    dm_body: str = ""
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -211,6 +218,77 @@ def send_email_via_gmail(data: SendEmailRequest):
 
         result = send_gmail(draft=body, to_email=to_email, subject=subject)
         return result
+
+    except Exception as e:
+        traceback.print_exc()
+        return {"sent": False, "error": repr(e)}
+
+
+# ─────────────────────────────────────────────────────────────────
+# LinkedIn Auth Status  (/linkedin-auth-status)
+# ─────────────────────────────────────────────────────────────────
+
+@app.get("/linkedin-auth-status")
+async def linkedin_auth_status():
+    """Check if LinkedIn session cookies exist."""
+    return ensure_linkedin_session()
+
+
+# ─────────────────────────────────────────────────────────────────
+# Send LinkedIn DM via Playwright  (/send-linkedin-dm)
+# ─────────────────────────────────────────────────────────────────
+
+@app.post("/send-linkedin-dm")
+async def send_dm_via_linkedin(data: SendLinkedInDMRequest):
+    """Send a DM to a prospect via Playwright browser automation."""
+    try:
+        print(f"\n📩 Sending LinkedIn DM to prospect #{data.prospect_id}...")
+        session = get_session(data.session_id)
+        targets = session.get("outreach_targets", [])
+
+        if data.prospect_id >= len(targets):
+            return {"sent": False, "error": f"Invalid prospect_id. Only {len(targets)} in session."}
+
+        target   = targets[data.prospect_id]
+        prospect = target.get("prospect", {})
+        name     = prospect.get("name", "Unknown")
+        li_url   = prospect.get("linkedin_url") or prospect.get("contact_url", "")
+
+        if not li_url or "linkedin.com" not in li_url:
+            return {"sent": False, "error": f"No LinkedIn URL found for {name}."}
+
+        # Use the edited DM body from frontend, or fall back to draft
+        dm_body = data.dm_body.strip()
+        if not dm_body:
+            email_data = target.get("email", {})
+            dm_body = email_data.get("body", "") if isinstance(email_data, dict) else ""
+        if not dm_body:
+            return {"sent": False, "error": "DM body is empty."}
+
+        # Get SSE queue for live log streaming
+        queue = _get_queue(data.session_id)
+
+        async def push_log(msg: str):
+            await queue.put(msg)
+
+        await push_log(f"🤖 Sending LinkedIn DM to {name}...")
+
+        result = await send_linkedin_dm(
+            prospect_url=li_url,
+            message=dm_body,
+            log_callback=push_log,
+        )
+
+        if result.get("sent"):
+            await push_log(f"✅ DM sent to {name} via LinkedIn!")
+        else:
+            await push_log(f"⚠️ DM failed for {name}: {result.get('error', 'unknown')}")
+
+        return {
+            "sent": result.get("sent", False),
+            "prospect_name": name,
+            "error": result.get("error"),
+        }
 
     except Exception as e:
         traceback.print_exc()

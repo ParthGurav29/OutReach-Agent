@@ -5,10 +5,10 @@ Pipeline:
   1. Plan → generate search queries
   2. Search → Tavily (LinkedIn-first)
   3. Dedup by LinkedIn slug
-  4. Extract → prospect info
-  5. Proxycurl enrichment → deeper bio / recent posts
+  4. Extract → prospect info + linkedin_url
+  5. Find emails (fallback channel)
   6. Score → quality filter
-  7. Draft → CCQ LinkedIn DMs
+  7. Draft → CCQ LinkedIn DMs (personalisation from Tavily snippets)
   8. Attach 7-touch cadence tracker per prospect
 """
 
@@ -22,7 +22,6 @@ from backend.tools.extractor import extract_prospect
 from backend.tools.email_finder import find_email
 from backend.tools.scorer import score_prospect
 from backend.tools.drafter import draft_email
-from backend.tools.proxycurl_enricher import enrich_linkedin_profile
 
 
 MAX_RETRIES        = 2
@@ -161,28 +160,11 @@ async def plan_campaign(
             await log(f"✅ {len(prospects)} prospects extracted")
 
             if prospects:
-                # ── STEP 4.5: Proxycurl LinkedIn Enrichment ────
-                await log("🔗 Enriching profiles via LinkedIn data...")
-
-                async def proxycurl_enrich(p):
-                    linkedin_url = p.get("linkedin_url") or p.get("url", "")
-                    if "linkedin.com/in/" in (linkedin_url or "").lower():
-                        pc_data = await enrich_linkedin_profile(linkedin_url)
-                        if pc_data:
-                            # Merge richer context back into prospect
-                            if pc_data.get("bio") and not p.get("personalisation_hook"):
-                                p["personalisation_hook"] = pc_data["bio"][:200]
-                            if pc_data.get("recent_posts"):
-                                p["recent_work"] = "; ".join(pc_data["recent_posts"][:2])
-                            if pc_data.get("skills") and not p.get("skills"):
-                                p["skills"] = pc_data["skills"]
-                            p["proxycurl_data"] = pc_data
-                    return p
-
-                enriched_prospects = await async_gather_chunks(
-                    [proxycurl_enrich(p) for p in prospects], chunk_size=3
-                )
-                prospects = [p for p in enriched_prospects if p]
+                # ── Map contact_url → linkedin_url ─────────────────
+                for p in prospects:
+                    if not p.get("linkedin_url"):
+                        contact = p.pop("contact_url", None) or p.get("url", "")
+                        p["linkedin_url"] = contact
 
                 # ── STEP 4.6: Email discovery (for fallback) ───
                 await log("📬 Finding emails (fallback channel)...")
@@ -246,19 +228,17 @@ async def plan_campaign(
     if not scored_results:
         return {"prospects_found": 0, "outreach_targets": []}
 
-    # ── STEP 6: Draft LinkedIn DMs ───────────────────────────────
+    # ── STEP 7: Draft LinkedIn DMs ───────────────────────────────
     await log(f"\n💬 Drafting LinkedIn DMs for {len(scored_results)} prospects...")
     tone = campaign_plan.get("tone", "friendly and professional")
 
     async def draft_for(r):
-        proxycurl_data = r["prospect"].get("proxycurl_data")
         return await draft_email(
-            prospect       = r["prospect"],
-            goal           = goal,
-            tone           = tone,
-            sender_name    = sender_name,
-            seeking        = seeking,
-            proxycurl_data = proxycurl_data,
+            prospect    = r["prospect"],
+            goal        = goal,
+            tone        = tone,
+            sender_name = sender_name,
+            seeking     = seeking,
         )
 
     dms = await async_gather_chunks([draft_for(r) for r in scored_results], chunk_size=5)

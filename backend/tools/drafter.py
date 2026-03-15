@@ -77,33 +77,23 @@ async def generate_linkedin_dms(
     personal_context: str,
     sender_name: str,
     seeking: str,
-    proxycurl_data: dict | None = None,
 ) -> list | None:
     """
     Generates 3 LinkedIn DM variants using the CCQ method.
-    Optionally uses Proxycurl data (bio, recent_posts, skills) for richer personalisation.
+    Uses Tavily search snippets for personalisation (no Proxycurl).
     """
 
     sender_identity = f"I'm {sender_name}" if sender_name else "I'm reaching out"
     if seeking:
         sender_identity += f", {seeking}"
 
-    # Build enrichment block from Proxycurl if available
+    # Build enrichment block from Tavily snippet data already on prospect
     enrichment_block = ""
-    if proxycurl_data:
-        bio          = proxycurl_data.get("bio", "")
-        headline     = proxycurl_data.get("headline", "")
-        recent_posts = proxycurl_data.get("recent_posts", [])
-        skills       = proxycurl_data.get("skills", [])
-
-        if headline:
-            enrichment_block += f"\nHeadline: {headline}"
-        if bio:
-            enrichment_block += f"\nBio / Summary: {bio[:300]}"
-        if recent_posts:
-            enrichment_block += f"\nRecent Activity: {'; '.join(recent_posts[:2])}"
-        if skills:
-            enrichment_block += f"\nTop Skills: {', '.join(skills[:5])}"
+    if prospect.get("recent_work"):
+        enrichment_block += f"\nRecent Activity: {prospect['recent_work']}"
+    if prospect.get("skills"):
+        skills_list = prospect["skills"] if isinstance(prospect["skills"], list) else [prospect["skills"]]
+        enrichment_block += f"\nSkills: {', '.join(skills_list[:5])}"
 
     prompt = f"""
 You are writing LinkedIn DMs ON BEHALF OF {sender_name or "the sender"}.
@@ -209,7 +199,6 @@ async def draft_email(
     tone: str,
     sender_name: str = "",
     seeking: str = "",
-    proxycurl_data: dict | None = None,
 ):
     """
     Main drafting function. Now generates LinkedIn DMs via CCQ method.
@@ -233,13 +222,12 @@ async def draft_email(
 
     # ── Generate CCQ DMs ──────────────────────────────────────────
     variants = await generate_linkedin_dms(
-        prospect        = prospect,
-        goal            = goal,
-        tone            = tone,
+        prospect         = prospect,
+        goal             = goal,
+        tone             = tone,
         personal_context = personal_context,
-        sender_name     = sender_name,
-        seeking         = seeking,
-        proxycurl_data  = proxycurl_data,
+        sender_name      = sender_name,
+        seeking          = seeking,
     )
 
     # ── Fallback if generation failed ────────────────────────────

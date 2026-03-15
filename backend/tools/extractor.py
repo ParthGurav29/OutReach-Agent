@@ -124,6 +124,10 @@ Rules:
         prospect.setdefault("personalisation_hook", None)
         prospect.setdefault("contact_url", url)
 
+        # Ensure linkedin_url is always set (used by frontend + Playwright sender)
+        if not prospect.get("linkedin_url"):
+            prospect["linkedin_url"] = prospect.get("contact_url", url)
+
         return prospect
 
     except Exception as e:
