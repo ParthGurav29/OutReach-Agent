@@ -1,0 +1,33 @@
+🤖 Opening LinkedIn browser...
+🔗 Navigating to profile: https://www.linkedin.com/in/williamhgates/
+💬 Looking for Message button...
+✅ Message dialog opened
+✍️  Typing message...
+⚠️ Playwright error: Locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator("div.msg-form__contenteditable[contenteditable=\"true\"]").first
+    - locator resolved to <div dir="auto" role="textbox" aria-multiline="true" contenteditable="true" aria-label="Write a message…" class="msg-form__contenteditable t-14 t-black--light t-normal flex-grow-1 full-height notranslate↵          ↵          ↵          ↵          ">…</div>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div tabindex="-1" aria-hidden="false" class="msg-connections-typeahead__transition-in↵            msg-connections-typeahead__search-results">…</div> from <div class="msg-connections-typeahead-container full-width↵        ">…</div> subtree intercepts pointer events
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div tabindex="-1" aria-hidden="false" class="msg-connections-typeahead__transition-in↵            msg-connections-typeahead__search-results">…</div> from <div class="msg-connections-typeahead-container full-width↵        ">…</div> subtree intercepts pointer events
+    - retrying click action
+      - waiting 100ms
+    57 × waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <div tabindex="-1" aria-hidden="false" class="msg-connections-typeahead__transition-in↵            msg-connections-typeahead__search-results">…</div> from <div class="msg-connections-typeahead-container full-width↵        ">…</div> subtree intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+
+{'sent': False, 'error': 'Playwright error: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator("div.msg-form__contenteditable[contenteditable=\\"true\\"]").first\n    - locator resolved to <div dir="auto" role="textbox" aria-multiline="true" contenteditable="true" aria-label="Write a message…" class="msg-form__contenteditable t-14 t-black--light t-normal flex-grow-1 full-height notranslate↵          ↵          ↵          ↵          ">…</div>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div tabindex="-1" aria-hidden="false" class="msg-connections-typeahead__transition-in↵            msg-connections-typeahead__search-results">…</div> from <div class="msg-connections-typeahead-container full-width↵        ">…</div> subtree intercepts pointer events\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div tabindex="-1" aria-hidden="false" class="msg-connections-typeahead__transition-in↵            msg-connections-typeahead__search-results">…</div> from <div class="msg-connections-typeahead-container full-width↵        ">…</div> subtree intercepts pointer events\n    - retrying click action\n      - waiting 100ms\n    57 × waiting for element to be visible, enabled and stable\n       - element is visible, enabled and stable\n       - scrolling into view if needed\n       - done scrolling\n       - <div tabindex="-1" aria-hidden="false" class="msg-connections-typeahead__transition-in↵            msg-connections-typeahead__search-results">…</div> from <div class="msg-connections-typeahead-container full-width↵        ">…</div> subtree intercepts pointer events\n     - retrying click action\n       - waiting 500ms\n'}

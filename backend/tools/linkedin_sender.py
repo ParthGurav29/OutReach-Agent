@@ -214,7 +214,10 @@ async def send_linkedin_dm(
                 await browser.close()
                 return {"sent": False, "error": "Could not find message input box"}
 
-            await msg_box.click()
+            # Dismiss any popup overlays and force click
+            await page.keyboard.press("Escape")
+            await asyncio.sleep(0.5)
+            await msg_box.click(force=True)
             await asyncio.sleep(random.uniform(0.5, 1.0))
 
             # Type character-by-character for human-like behavior
@@ -243,7 +246,7 @@ async def send_linkedin_dm(
                 await browser.close()
                 return {"sent": False, "error": "Could not find Send button"}
 
-            await send_btn.click()
+            await send_btn.click(force=True)
             await asyncio.sleep(random.uniform(1.5, 3.0))
 
             # ── Save updated cookies ──────────────────────────────

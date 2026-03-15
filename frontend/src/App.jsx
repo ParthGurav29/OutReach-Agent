@@ -97,7 +97,7 @@ function CadenceBadge({ cadence }) {
   );
 }
 
-function ProspectCard({ item, index, sessionId, prospectId }) {
+function ProspectCard({ item, index, sessionId, prospectId, onSendStart, onSendEnd }) {
   const [open, setOpen]       = useState(index === 0);
   const [sending, setSending] = useState(false);
   const [sent, setSent]       = useState(null);
@@ -121,6 +121,7 @@ function ProspectCard({ item, index, sessionId, prospectId }) {
 
   const sendDM = async () => {
     setSending(true);
+    if (onSendStart) onSendStart();
     try {
       const res = await fetch("/send-linkedin-dm", {
         method:"POST",
@@ -131,6 +132,7 @@ function ProspectCard({ item, index, sessionId, prospectId }) {
       setSent(data.sent ? "sent" : "failed");
     } catch { setSent("failed"); }
     setSending(false);
+    if (onSendEnd) onSendEnd();
   };
 
   const dmTypeMeta = {
@@ -311,9 +313,10 @@ export default function App() {
   const [result, setResult]         = useState(null);
   const [error, setError]           = useState(null);
   const [logs, setLogs]             = useState([]);
-  const [activeTab, setActiveTab]   = useState("leads");
   const [launched, setLaunched]     = useState(false);
   const [launching, setLaunching]   = useState(false);
+  const [sendingDM, setSendingDM]   = useState(false);
+  const [activeTab, setActiveTab]   = useState("leads");
 
   const [history, setHistory] = useState(() => {
     try { const s = localStorage.getItem("ag_campaign_history"); return s ? JSON.parse(s) : []; }
@@ -571,8 +574,8 @@ export default function App() {
         />
       )}
 
-      {/* Live Terminal — only visible while running or launching */}
-      {(isRunning || launching) && <AgentWindow logs={logs} />}
+      {/* Live Terminal — only visible while running or launching or sending DM */}
+      {(isRunning || launching || sendingDM) && <AgentWindow logs={logs} />}
 
       {/* Error */}
       {error && (
@@ -632,7 +635,7 @@ export default function App() {
               <PaginationBar page={page} totalPages={totalPages} totalLeads={totalLeads} onPageChange={fetchPage} />
               <div style={{ display:"flex", flexDirection:"column" }}>
                 {isPaginating ? <Skeletons /> : result.outreach_targets?.map((item, i) => (
-                  <ProspectCard key={i} item={item} index={(page-1)*10+i} sessionId={SESSION_ID} prospectId={(page-1)*10+i} />
+                  <ProspectCard key={i} item={item} index={(page-1)*10+i} sessionId={SESSION_ID} prospectId={(page-1)*10+i} onSendStart={() => { setSendingDM(true); connectSSE(SESSION_ID); }} onSendEnd={() => setTimeout(() => setSendingDM(false), 3000)} />
                 ))}
               </div>
               {!isPaginating && result.outreach_targets?.length > 0 && totalPages > 1 && (
