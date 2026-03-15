@@ -40,6 +40,7 @@ def get_session(session_id: str) -> dict:
 class CampaignRequest(BaseModel):
     goal: str
     session_id: str
+    lead_count: int = 10
 
 # ─────────────────────────────────────────────────────────────────
 # Request Queues for SSE
@@ -89,7 +90,7 @@ async def run_campaign_api(data: CampaignRequest):
         
     async def _run():
         try:
-            await run_pipeline(data.goal, session, log_cb, send_card_cb)
+            await run_pipeline(data.goal, session, log_cb, send_card_cb, data.lead_count)
         except Exception as e:
             traceback.print_exc()
             await log_cb(f"[✗] Pipeline Error: {e}")

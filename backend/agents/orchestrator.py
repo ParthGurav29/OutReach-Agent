@@ -122,7 +122,7 @@ async def _process_prospect(prospect_data, plan, log_cb, send_card_cb):
     
     return card
 
-async def run_pipeline(goal: str, session: dict, log_cb, send_card_cb):
+async def run_pipeline(goal: str, session: dict, log_cb, send_card_cb, lead_count: int = 10):
     previous_queries = session.get("used_queries", [])
     
     retry_count = 0
@@ -179,7 +179,7 @@ async def run_pipeline(goal: str, session: dict, log_cb, send_card_cb):
                 
         # Now process all concurrently, but cap concurrency to avoid rate limits
         tasks = []
-        for p in prospects[:10]: # Process max 10 to keep it demoable
+        for p in prospects[:lead_count]: # Process max lead_count to keep it demoable
             tasks.append(_process_prospect(p, plan, log_cb, send_card_cb))
             
         await log_cb(f"[~] Generating profiles and dispatching micro-agents...")
