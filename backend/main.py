@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from backend.agents.orchestrator import run_pipeline
+from agents.orchestrator import run_pipeline
 
 app = FastAPI(title="ReachAgent — Antigravity Edition")
 
