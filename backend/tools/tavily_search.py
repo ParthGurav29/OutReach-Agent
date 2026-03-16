@@ -66,3 +66,5 @@ async def parallel_search(queries: list[str]):
     tasks = [search_tavily(query) for query in queries]
     results = await asyncio.gather(*tasks)
     return results
+
+
