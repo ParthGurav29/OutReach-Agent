@@ -14,7 +14,7 @@ app = FastAPI(title="ReachAgent — Antigravity Edition")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://out-reach-agent.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
