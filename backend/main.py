@@ -1,6 +1,7 @@
 import asyncio
 import json
 import traceback
+import sys
 from typing import AsyncGenerator
 from dotenv import load_dotenv
 load_dotenv()
@@ -10,8 +11,18 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.agents.orchestrator import run_pipeline
+
+# Ensure live log updates in Render/Gunicorn
+sys.stdout.reconfigure(line_buffering=True)
+
 app = FastAPI(title="ReachAgent — Antigravity Edition")
 
+# Health check (must respond immediately for Render)
+@app.get("/")
+def health():
+    return {"status": "ok"}
+
+# Explicit CORS for Vercel
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://out-reach-agent.vercel.app"],
@@ -60,7 +71,6 @@ async def _sse_generator(session_id: str) -> AsyncGenerator[str, None]:
             if msg == "__DONE__":
                 yield f"data: {json.dumps({'type': 'done'})}\n\n"
                 break
-            # msg is a dict we can serialize
             yield f"data: {json.dumps(msg)}\n\n"
         except asyncio.TimeoutError:
             yield "data: {\"type\": \"keepalive\"}\n\n"
@@ -97,18 +107,10 @@ async def run_campaign_api(data: CampaignRequest):
         finally:
             await queue.put("__DONE__")
             
-    # Run in background to let HTTP request return immediately
     asyncio.create_task(_run())
     return {"status": "started"}
 
 if __name__ == "__main__":
     import uvicorn
+    # Local dev fallback
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
-
-
-
-
-
-@app.get("/")
-def root():
-    return {"status": "Outreach Agent backend running"}

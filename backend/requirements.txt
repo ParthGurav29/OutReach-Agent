@@ -7,3 +7,4 @@ boto3
 tavily-python
 aiohttp
 httpx
+requests
