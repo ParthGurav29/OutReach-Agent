@@ -3,6 +3,9 @@ import { TerminalPanel } from './TerminalPanel';
 import { ProspectCard } from './ProspectCard';
 import { ProspectDrawer } from './ProspectDrawer';
 
+// Use environment variable for API Base URL with a fallback for local development
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
 export default function App() {
   const [goal, setGoal] = useState('');
   
@@ -64,7 +67,7 @@ export default function App() {
     }
     
     // Connect SSE
-    const eventSource = new EventSource(`http://127.0.0.1:8000/stream-campaign?session_id=${sessionId}`);
+    const eventSource = new EventSource(`${API_BASE_URL}/stream-campaign?session_id=${sessionId}`);
     
     eventSource.onmessage = (event) => {
       try {
@@ -94,7 +97,7 @@ export default function App() {
     };
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/run-campaign", {
+      const res = await fetch(`${API_BASE_URL}/run-campaign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
